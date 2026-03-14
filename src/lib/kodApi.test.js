@@ -42,7 +42,11 @@ function resolveJsonpRequest(payload) {
 describe('kodApi', () => {
   it('builds a SearchServlet JSONP request and normalizes search results', async () => {
     const resultPromise = searchSongs(DEFAULT_BASE_URL, {
+      songName: '',
+      songType: '',
+      singer: '',
       lang: '\u56fd\u8bed',
+      sortType: '',
       page: 0,
     })
 
@@ -50,7 +54,11 @@ describe('kodApi', () => {
     const requestUrl = new URL(script.src)
 
     expect(requestUrl.pathname).toBe('/SearchServlet')
+    expect(requestUrl.searchParams.get('songName')).toBe('')
+    expect(requestUrl.searchParams.get('songType')).toBe('')
+    expect(requestUrl.searchParams.get('singer')).toBe('')
     expect(requestUrl.searchParams.get('lang')).toBe('\u56fd\u8bed')
+    expect(requestUrl.searchParams.get('sortType')).toBe('')
     expect(requestUrl.searchParams.get('page')).toBe('0')
     expect(requestUrl.searchParams.get('jsonpCallback')).toMatch(/^__openKodJsonp_/)
 
@@ -401,9 +409,9 @@ describe('kodApi', () => {
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/SingerServlet')
-    expect(requestUrl.searchParams.get('singer')).toBeNull()
+    expect(requestUrl.searchParams.get('singer')).toBe('')
     expect(requestUrl.searchParams.get('singerType')).toBe('\u5168\u90e8')
-    expect(requestUrl.searchParams.get('sortType')).toBeNull()
+    expect(requestUrl.searchParams.get('sortType')).toBe('')
     expect(requestUrl.searchParams.get('page')).toBe('0')
 
     resolveJsonpRequest({

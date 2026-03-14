@@ -1,17 +1,21 @@
 const REQUEST_TIMEOUT_MS = 10000
 
 export const DEFAULT_BASE_URL = 'http://192.168.0.8:8080'
-export const DEFAULT_LANG = '\u56fd\u8bed'
 
 function normalizeBaseUrl(baseUrl) {
   return `${baseUrl.replace(/\/+$/, '')}/`
 }
 
-function buildUrl(baseUrl, path, params) {
+function buildUrl(baseUrl, path, params, options = {}) {
   const url = new URL(path.replace(/^\/+/, ''), normalizeBaseUrl(baseUrl))
+  const includeEmptyString = options.includeEmptyString === true
 
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== '' && value !== null && value !== undefined) {
+    if (
+      value !== null &&
+      value !== undefined &&
+      (value !== '' || includeEmptyString)
+    ) {
       url.searchParams.set(key, String(value))
     }
   })
@@ -19,14 +23,14 @@ function buildUrl(baseUrl, path, params) {
   return url.toString()
 }
 
-export function jsonp(baseUrl, path, params = {}) {
+export function jsonp(baseUrl, path, params = {}, options = {}) {
   return new Promise((resolve, reject) => {
     const callbackName = `__openKodJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`
     const requestUrl = buildUrl(baseUrl, path, {
       ...params,
       jsonpCallback: callbackName,
       _: Date.now(),
-    })
+    }, options)
     const script = document.createElement('script')
 
     const cleanup = () => {
@@ -82,7 +86,7 @@ function normalizeSinger(song) {
 }
 
 export async function searchSongs(baseUrl, params) {
-  const payload = await jsonp(baseUrl, 'SearchServlet', params)
+  const payload = await jsonp(baseUrl, 'SearchServlet', params, { includeEmptyString: true })
 
   return {
     page: Number(payload.page ?? params.page ?? 0),
@@ -171,7 +175,7 @@ export async function fetchPlaylist(baseUrl) {
 }
 
 export async function fetchSingers(baseUrl, params) {
-  const payload = await jsonp(baseUrl, 'SingerServlet', params)
+  const payload = await jsonp(baseUrl, 'SingerServlet', params, { includeEmptyString: true })
 
   return {
     page: Number(payload.page ?? params.page ?? 0),

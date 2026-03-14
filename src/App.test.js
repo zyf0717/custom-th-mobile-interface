@@ -20,6 +20,9 @@ const {
   toggleMute,
   toggleVocals,
   restartDevice,
+  createObjectUrl,
+  revokeObjectUrl,
+  anchorClick,
 } = vi.hoisted(() => ({
   searchSongs: vi.fn(),
   fetchPlaylist: vi.fn(),
@@ -39,11 +42,13 @@ const {
   toneReset: vi.fn(),
   toneDown: vi.fn(),
   toneUp: vi.fn(),
+  createObjectUrl: vi.fn(),
+  revokeObjectUrl: vi.fn(),
+  anchorClick: vi.fn(),
 }))
 
 vi.mock('./lib/kodApi', () => ({
   DEFAULT_BASE_URL: 'http://192.168.0.8:8080',
-  DEFAULT_LANG: '\u56fd\u8bed',
   deleteSong,
   fetchPlaylist,
   fetchSingers,
@@ -124,6 +129,9 @@ function buildSingerResponse() {
 describe('App', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    URL.createObjectURL = createObjectUrl
+    URL.revokeObjectURL = revokeObjectUrl
+    HTMLAnchorElement.prototype.click = anchorClick
 
     searchSongs.mockReset()
     fetchPlaylist.mockReset()
@@ -143,6 +151,9 @@ describe('App', () => {
     toneReset.mockReset()
     toneDown.mockReset()
     toneUp.mockReset()
+    createObjectUrl.mockReset()
+    revokeObjectUrl.mockReset()
+    anchorClick.mockReset()
 
     searchSongs.mockResolvedValue(buildSearchResponse())
     fetchPlaylist.mockResolvedValue(buildPlaylistResponse())
@@ -162,6 +173,7 @@ describe('App', () => {
     toneReset.mockResolvedValue({ cmd: 'Tone_nom', code: '0' })
     toneDown.mockResolvedValue({ cmd: 'Tone_down', code: '0' })
     toneUp.mockResolvedValue({ cmd: 'Tone_up', code: '0' })
+    createObjectUrl.mockReturnValue('blob:open-kod-report')
   })
 
   it('loads search results and playlist items on mount', async () => {
@@ -199,7 +211,6 @@ describe('App', () => {
     await wrapper.get('[data-test="search-singer"]').setValue('Eason')
     await wrapper.get('[data-test="search-language"]').setValue('\u82f1\u8bed')
     await wrapper.get('[data-test="search-song-type"]').setValue('\u5bf9\u5531')
-    await wrapper.get('[data-test="search-sort-type"]').setValue('TopByNewSong')
     await wrapper.get('[data-test="search-reset"]').trigger('click')
     await flushPromises()
 
@@ -207,7 +218,6 @@ describe('App', () => {
     expect(wrapper.get('[data-test="search-singer"]').element.value).toBe('')
     expect(wrapper.get('[data-test="search-language"]').element.value).toBe('')
     expect(wrapper.get('[data-test="search-song-type"]').element.value).toBe('')
-    expect(wrapper.get('[data-test="search-sort-type"]').element.value).toBe('')
 
     wrapper.unmount()
   })
@@ -222,6 +232,22 @@ describe('App', () => {
     expect(wrapper.text()).toContain('Singer')
     expect(mobilePanels[2].classes()).not.toContain('mobile-panel-hidden')
     expect(mobilePanels[0].classes()).toContain('mobile-panel-hidden')
+
+    wrapper.unmount()
+  })
+
+  it('switches between desktop browse tabs', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+    const desktopTabs = wrapper.findAll('[data-test^="desktop-tab-"]')
+    const mobilePanels = wrapper.findAll('section.mobile-panel')
+    await desktopTabs[2].trigger('click')
+
+    expect(desktopTabs[2].classes()).toContain('mobile-tab-active')
+    expect(desktopTabs[1].classes()).not.toContain('mobile-tab-active')
+    expect(mobilePanels[1].classes()).toContain('desktop-panel-hidden')
+    expect(mobilePanels[2].classes()).not.toContain('desktop-panel-hidden')
 
     wrapper.unmount()
   })
@@ -534,6 +560,21 @@ describe('App', () => {
 
     expect(wrapper.get('[data-test="command-mic-up"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('[data-test="command-mic-down"]').attributes('disabled')).toBeUndefined()
+
+    wrapper.unmount()
+  })
+
+  it('downloads a diagnostics report from Setup', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="download-report"]').trigger('click')
+    await flushPromises()
+
+    expect(createObjectUrl).toHaveBeenCalledTimes(1)
+    expect(anchorClick).toHaveBeenCalledTimes(1)
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:open-kod-report')
+    expect(wrapper.text()).toContain('Issue report downloaded. Attach it to your email.')
 
     wrapper.unmount()
   })

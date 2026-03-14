@@ -1,5 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import packageJson from '../package.json'
+import SettingsPanel from './components/SettingsPanel.vue'
 import {
   DEFAULT_BASE_URL,
   deleteSong,
@@ -23,6 +25,8 @@ import {
 } from './lib/kodApi'
 
 const POLL_INTERVAL_MS = 5000
+const DIAGNOSTIC_EVENT_LIMIT = 25
+const SUPPORT_EMAIL = 'zyf0717@gmail.com'
 const STORAGE_KEY = 'open-kod-base-url'
 const THEME_STORAGE_KEY = 'open-kod-theme'
 const MIC_CONTROL_STORAGE_KEY = 'open-kod-mic-controlled'
@@ -87,10 +91,10 @@ const SINGER_COUNTRY_OPTIONS = [
 
 const activeBaseUrl = ref(window.localStorage.getItem(STORAGE_KEY) || DEFAULT_BASE_URL)
 const baseUrlInput = ref(activeBaseUrl.value)
-const autoRefresh = ref(true)
 const pageInput = ref(1)
 const singerPageInput = ref(1)
 const activeMobileTab = ref('topHits')
+const activeBrowseTab = ref('topHits')
 const commandBarBusy = ref(false)
 const commandBarRef = ref(null)
 const isDarkMode = ref(window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark')
@@ -113,28 +117,34 @@ const singerForm = reactive({
 const searchState = reactive({
   page: 0,
   maxPage: null,
-  number: 0,
-  status: 'Ready to search.',
   loading: false,
   songs: [],
 })
 
 const playlistState = reactive({
   loading: false,
-  number: 0,
   songs: [],
 })
 
 const singerState = reactive({
   page: 0,
   maxPage: null,
-  number: 0,
   loading: false,
   singers: [],
 })
 
+const diagnosticsState = reactive({
+  lastError: '',
+  lastRequest: '',
+  lastRequestLabel: '',
+  lastResponse: '',
+  reportStatus: '',
+  events: [],
+})
+
 let pollHandle = null
 let commandBarResizeObserver = null
+let reportStatusTimeout = null
 
 const displayPage = computed(() => searchState.page + 1)
 const singerDisplayPage = computed(() => singerState.page + 1)
@@ -158,6 +168,99 @@ function resolveBaseUrl(value) {
   return value.trim() || DEFAULT_BASE_URL
 }
 
+function logDiagnosticEvent(message) {
+  diagnosticsState.events.unshift(`${new Date().toISOString()} ${message}`)
+  diagnosticsState.events.splice(DIAGNOSTIC_EVENT_LIMIT)
+}
+
+function setLastRequest(label, details) {
+  diagnosticsState.lastRequestLabel = label
+  diagnosticsState.lastRequest = details
+}
+
+function setLastResponse(details) {
+  diagnosticsState.lastResponse = details
+}
+
+function setLastError(message) {
+  diagnosticsState.lastError = message
+}
+
+function clearReportStatus() {
+  if (reportStatusTimeout) {
+    window.clearTimeout(reportStatusTimeout)
+    reportStatusTimeout = null
+  }
+}
+
+function setReportStatus(message) {
+  clearReportStatus()
+  diagnosticsState.reportStatus = message
+
+  if (message) {
+    reportStatusTimeout = window.setTimeout(() => {
+      diagnosticsState.reportStatus = ''
+      reportStatusTimeout = null
+    }, 4000)
+  }
+}
+
+function downloadTextFile(filename, text) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
+function buildDiagnosticsReport() {
+  const lines = [
+    'Open KOD issue report',
+    `Version: ${packageJson.version}`,
+    `Generated: ${new Date().toISOString()}`,
+    `Base URL: ${activeBaseUrl.value}`,
+    `Active mobile tab: ${activeMobileTab.value}`,
+    `Active browse tab: ${activeBrowseTab.value}`,
+    `Theme: ${isDarkMode.value ? 'dark' : 'light'}`,
+    `Mic controlled by KOD: ${micControlledByKod.value ? 'yes' : 'no'}`,
+    `Top Hits filters: title="${searchForm.songName}" singer="${searchForm.singer}" lang="${searchForm.lang}" songType="${searchForm.songType}" sortType="${searchForm.sortType}"`,
+    `Top Hits page: ${displayPage.value}${searchState.maxPage ? `/${searchState.maxPage}` : ''}`,
+    `Singer filters: singer="${singerForm.singer}" country="${singerForm.singerType}"`,
+    `Singer page: ${singerDisplayPage.value}${singerState.maxPage ? `/${singerState.maxPage}` : ''}`,
+    `Playlist items: ${playlistState.songs.length}`,
+    `Last request: ${diagnosticsState.lastRequestLabel || 'n/a'} ${diagnosticsState.lastRequest || ''}`.trim(),
+    `Last response: ${diagnosticsState.lastResponse || 'n/a'}`,
+    `Last error: ${diagnosticsState.lastError || 'none'}`,
+    `User agent: ${navigator.userAgent}`,
+    'Recent events:',
+    ...diagnosticsState.events,
+  ]
+
+  return lines.join('\n')
+}
+
+function buildReportFilename() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  return `open-kod-issue-report-${stamp}.txt`
+}
+
+function downloadIssueReport() {
+  try {
+    downloadTextFile(buildReportFilename(), buildDiagnosticsReport())
+    setReportStatus('Issue report downloaded. Attach it to your email.')
+    logDiagnosticEvent('Issue report downloaded')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    setReportStatus('Unable to download the issue report on this browser.')
+    setLastError(message)
+    logDiagnosticEvent(`Issue report download failed: ${message}`)
+  }
+}
+
 function singerImageUrl(fileName) {
   if (!fileName) {
     return ''
@@ -168,9 +271,9 @@ function singerImageUrl(fileName) {
 
 async function runSearch() {
   searchState.loading = true
-  searchState.status = `Searching page ${displayPage.value}...`
 
   try {
+    setLastRequest('SearchServlet', `page=${searchState.page} songName="${searchForm.songName.trim()}" singer="${searchForm.singer.trim()}" lang="${searchForm.lang.trim()}" songType="${searchForm.songType.trim()}" sortType="${searchForm.sortType.trim()}"`)
     const response = await searchSongs(activeBaseUrl.value, {
       songName: searchForm.songName.trim(),
       singer: searchForm.singer.trim(),
@@ -181,30 +284,41 @@ async function runSearch() {
     })
 
     searchState.page = response.page
-    pageInput.value = response.page + 1
     searchState.maxPage = response.maxPage
-    searchState.number = response.number
+    pageInput.value = response.page + 1
     searchState.songs = response.songs
-    searchState.status = response.songs.length
-      ? `Showing ${response.number} result(s) on page ${response.page + 1}.`
-      : 'No songs returned for this query.'
+    setLastResponse(`Search returned ${response.number} result(s), max page ${response.maxPage ?? 'n/a'}`)
+    setLastError('')
+    logDiagnosticEvent(`Search returned ${response.number} result(s)`)
   } catch (error) {
+    searchState.maxPage = null
     searchState.songs = []
-    searchState.status = error.message
+    setLastError(error instanceof Error ? error.message : String(error))
+    setLastResponse('Search failed')
+    logDiagnosticEvent(`Search failed: ${diagnosticsState.lastError}`)
     console.error(error)
   } finally {
     searchState.loading = false
   }
 }
 
-async function refreshPlaylist() {
+async function refreshPlaylist(force = false) {
+  if (playlistState.loading && !force) {
+    return
+  }
+
   playlistState.loading = true
 
   try {
+    setLastRequest('PlaylistServlet', 'type=1 onSelectPage=true')
     const response = await fetchPlaylist(activeBaseUrl.value)
-    playlistState.number = response.number
     playlistState.songs = response.songs
+    setLastResponse(`Playlist returned ${response.number} item(s)`)
+    setLastError('')
   } catch (error) {
+    setLastError(error instanceof Error ? error.message : String(error))
+    setLastResponse('Playlist refresh failed')
+    logDiagnosticEvent(`Playlist refresh failed: ${diagnosticsState.lastError}`)
     console.error(error)
   } finally {
     playlistState.loading = false
@@ -215,6 +329,7 @@ async function runSingerSearch() {
   singerState.loading = true
 
   try {
+    setLastRequest('SingerServlet', `page=${singerState.page} singer="${singerForm.singer.trim()}" singerType="${singerForm.singerType}"`)
     const response = await fetchSingers(activeBaseUrl.value, {
       singer: singerForm.singer.trim(),
       singerType: singerForm.singerType,
@@ -222,13 +337,19 @@ async function runSingerSearch() {
       page: singerState.page,
     })
 
-      singerState.page = response.page
-      singerPageInput.value = response.page + 1
-      singerState.maxPage = response.maxPage
-      singerState.number = response.number
-      singerState.singers = response.singers
+    singerState.page = response.page
+    singerState.maxPage = response.maxPage
+    singerPageInput.value = response.page + 1
+    singerState.singers = response.singers
+    setLastResponse(`Singer search returned ${response.number} result(s), max page ${response.maxPage ?? 'n/a'}`)
+    setLastError('')
+    logDiagnosticEvent(`Singer search returned ${response.number} result(s)`)
   } catch (error) {
+    singerState.maxPage = null
     singerState.singers = []
+    setLastError(error instanceof Error ? error.message : String(error))
+    setLastResponse('Singer search failed')
+    logDiagnosticEvent(`Singer search failed: ${diagnosticsState.lastError}`)
     console.error(error)
   } finally {
     singerState.loading = false
@@ -252,8 +373,21 @@ function resetSingerSearch() {
 function searchTopHitsBySinger(singerName) {
   clearSearchForm()
   searchForm.singer = singerName.trim()
-  activeMobileTab.value = 'topHits'
+  setBrowseTab('topHits')
   runSearch()
+}
+
+function setMobileTab(tab) {
+  activeMobileTab.value = tab
+
+  if (tab === 'topHits' || tab === 'singer') {
+    activeBrowseTab.value = tab
+  }
+}
+
+function setBrowseTab(tab) {
+  activeBrowseTab.value = tab
+  activeMobileTab.value = tab
 }
 
 function goToPreviousSingerPage() {
@@ -293,9 +427,16 @@ async function addSong(songId) {
   }
 
   try {
+    setLastRequest('CommandServlet', `cmd=Add1 cmdValue=${songId}`)
     await queueSong(activeBaseUrl.value, songId)
-    await refreshPlaylist()
+    setLastResponse(`Command Add1 succeeded for ${songId}`)
+    setLastError('')
+    logDiagnosticEvent(`Queued song ${songId}`)
+    await refreshPlaylist(true)
   } catch (error) {
+    setLastError(error instanceof Error ? error.message : String(error))
+    setLastResponse('Command Add1 failed')
+    logDiagnosticEvent(`Queue failed for ${songId}: ${diagnosticsState.lastError}`)
     console.error(error)
   }
 }
@@ -306,9 +447,16 @@ async function promoteSong(songId) {
   }
 
   try {
+    setLastRequest('CommandServlet', `cmd=Pro1 cmdValue=${songId}`)
     await prioritizeSong(activeBaseUrl.value, songId)
-    await refreshPlaylist()
+    setLastResponse(`Command Pro1 succeeded for ${songId}`)
+    setLastError('')
+    logDiagnosticEvent(`Prioritized song ${songId}`)
+    await refreshPlaylist(true)
   } catch (error) {
+    setLastError(error instanceof Error ? error.message : String(error))
+    setLastResponse('Command Pro1 failed')
+    logDiagnosticEvent(`Prioritize failed for ${songId}: ${diagnosticsState.lastError}`)
     console.error(error)
   }
 }
@@ -319,9 +467,16 @@ async function removeSong(songId) {
   }
 
   try {
+    setLastRequest('CommandServlet', `cmd=Del1 cmdValue=${songId}`)
     await deleteSong(activeBaseUrl.value, songId)
-    await refreshPlaylist()
+    setLastResponse(`Command Del1 succeeded for ${songId}`)
+    setLastError('')
+    logDiagnosticEvent(`Deleted song ${songId}`)
+    await refreshPlaylist(true)
   } catch (error) {
+    setLastError(error instanceof Error ? error.message : String(error))
+    setLastResponse('Command Del1 failed')
+    logDiagnosticEvent(`Delete failed for ${songId}: ${diagnosticsState.lastError}`)
     console.error(error)
   }
 }
@@ -334,9 +489,16 @@ async function runGlobalCommand(commandRunner) {
   commandBarBusy.value = true
 
   try {
+    setLastRequest('CommandServlet', `cmd=${commandRunner.name || 'unknown'}`)
     await commandRunner(activeBaseUrl.value)
-    await refreshPlaylist()
+    setLastResponse(`Command ${commandRunner.name || 'unknown'} succeeded`)
+    setLastError('')
+    logDiagnosticEvent(`Command ${commandRunner.name || 'unknown'} succeeded`)
+    await refreshPlaylist(true)
   } catch (error) {
+    setLastError(error instanceof Error ? error.message : String(error))
+    setLastResponse(`Command ${commandRunner.name || 'unknown'} failed`)
+    logDiagnosticEvent(`Command ${commandRunner.name || 'unknown'} failed: ${diagnosticsState.lastError}`)
     console.error(error)
   } finally {
     commandBarBusy.value = false
@@ -384,9 +546,10 @@ function saveBaseUrl() {
   activeBaseUrl.value = resolveBaseUrl(baseUrlInput.value)
   baseUrlInput.value = activeBaseUrl.value
   window.localStorage.setItem(STORAGE_KEY, activeBaseUrl.value)
+  logDiagnosticEvent(`Base URL saved: ${activeBaseUrl.value}`)
   runSearch()
   runSingerSearch()
-  refreshPlaylist()
+  refreshPlaylist(true)
 }
 
 function syncPolling() {
@@ -395,11 +558,9 @@ function syncPolling() {
     pollHandle = null
   }
 
-  if (autoRefresh.value) {
-    pollHandle = window.setInterval(() => {
-      refreshPlaylist()
-    }, POLL_INTERVAL_MS)
-  }
+  pollHandle = window.setInterval(() => {
+    refreshPlaylist()
+  }, POLL_INTERVAL_MS)
 }
 
 function updateCommandBarOffset() {
@@ -419,10 +580,6 @@ function saveMicControlPreference() {
   window.localStorage.setItem(MIC_CONTROL_STORAGE_KEY, micControlledByKod.value ? 'true' : 'false')
 }
 
-watch(autoRefresh, () => {
-  syncPolling()
-})
-
 watch(isDarkMode, () => {
   applyTheme()
 })
@@ -433,6 +590,7 @@ watch(micControlledByKod, () => {
 
 onMounted(() => {
   applyTheme()
+  logDiagnosticEvent('Session started')
   syncPolling()
   runSearch()
   runSingerSearch()
@@ -458,73 +616,21 @@ onBeforeUnmount(() => {
     commandBarResizeObserver.disconnect()
   }
 
+  clearReportStatus()
+
   window.removeEventListener('resize', updateCommandBarOffset)
 })
 </script>
 
 <template>
   <main class="app-shell">
-    <section class="hero-panel panel desktop-only settings-panel">
-      <header class="hero">
-        <div class="hero-copy">
-          <h1>Open KOD</h1>
-          <p class="subtitle">
-            An alternative interface for the same device endpoints used by the default KOD app.
-          </p>
-          <p class="field-help settings-note">
-            <em>Disclaimer: your device is communicating directly with the karaoke device over a local network, and does not relay data to any external server.</em>
-          </p>
-        </div>
-
-        <form class="stack" @submit.prevent="saveBaseUrl">
-          <label>
-            <span class="field-help">Scan the QR code on the KTV display, then paste the server URL here, for example: <code>http://192.168.1.123:8080</code></span>
-            <div class="input-action-row">
-              <input
-                v-model="baseUrlInput"
-                data-test="base-url-input"
-                type="url"
-                placeholder="http://192.168.0.8:8080"
-              />
-              <button data-test="save-base-url" type="button" class="button-emoji" @click="saveBaseUrl">➤</button>
-            </div>
-          </label>
-          <div class="theme-control">
-            <span class="field-help">Light/Dark theme:</span>
-            <button
-              type="button"
-              class="button-secondary theme-toggle"
-              :aria-pressed="isDarkMode"
-              :title="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
-              @click="isDarkMode = !isDarkMode"
-            >
-              {{ isDarkMode ? '☀︎' : '⏾' }}
-            </button>
-          </div>
-          <div class="toggle-text-row">
-            <span class="field-help">Microphones controlled by KOD: </span>
-            <button
-              data-test="mic-controlled-toggle"
-              type="button"
-              class="button-secondary text-toggle"
-              :aria-pressed="micControlledByKod"
-              :title="micControlledByKod ? 'Disable KOD microphone controls' : 'Enable KOD microphone controls'"
-              @click="micControlledByKod = !micControlledByKod"
-            >
-              {{ micControlledByKod ? '✓' : '\u00A0' }}
-            </button>
-          </div>
-        </form>
-      </header>
-    </section>
-
     <div class="mobile-tabs section-gap" role="tablist" aria-label="Main panels">
       <button
         type="button"
         class="mobile-tab"
         :class="{ 'mobile-tab-active': activeMobileTab === 'settings' }"
         :aria-selected="activeMobileTab === 'settings'"
-        @click="activeMobileTab = 'settings'"
+        @click="setMobileTab('settings')"
       >
         Setup
       </button>
@@ -533,7 +639,7 @@ onBeforeUnmount(() => {
         class="mobile-tab"
         :class="{ 'mobile-tab-active': activeMobileTab === 'topHits' }"
         :aria-selected="activeMobileTab === 'topHits'"
-        @click="activeMobileTab = 'topHits'"
+        @click="setBrowseTab('topHits')"
       >
         Top Hits
       </button>
@@ -542,7 +648,7 @@ onBeforeUnmount(() => {
         class="mobile-tab"
         :class="{ 'mobile-tab-active': activeMobileTab === 'singer' }"
         :aria-selected="activeMobileTab === 'singer'"
-        @click="activeMobileTab = 'singer'"
+        @click="setBrowseTab('singer')"
       >
         Singer
       </button>
@@ -551,67 +657,76 @@ onBeforeUnmount(() => {
         class="mobile-tab"
         :class="{ 'mobile-tab-active': activeMobileTab === 'playlist' }"
         :aria-selected="activeMobileTab === 'playlist'"
-        @click="activeMobileTab = 'playlist'"
+        @click="setMobileTab('playlist')"
       >
         Playlist
       </button>
     </div>
 
+    <div class="desktop-tabs desktop-only section-gap" role="tablist" aria-label="Main panels">
+      <button
+        data-test="desktop-tab-settings"
+        type="button"
+        class="mobile-tab"
+        :class="{ 'mobile-tab-active': activeBrowseTab === 'settings' }"
+        :aria-selected="activeBrowseTab === 'settings'"
+        @click="setBrowseTab('settings')"
+      >
+        Setup
+      </button>
+      <button
+        data-test="desktop-tab-top-hits"
+        type="button"
+        class="mobile-tab"
+        :class="{ 'mobile-tab-active': activeBrowseTab === 'topHits' }"
+        :aria-selected="activeBrowseTab === 'topHits'"
+        @click="setBrowseTab('topHits')"
+      >
+        Top Hits
+      </button>
+      <button
+        data-test="desktop-tab-singer"
+        type="button"
+        class="mobile-tab"
+        :class="{ 'mobile-tab-active': activeBrowseTab === 'singer' }"
+        :aria-selected="activeBrowseTab === 'singer'"
+        @click="setBrowseTab('singer')"
+      >
+        Singer
+      </button>
+    </div>
+
     <div class="main-panels section-gap">
       <div class="primary-column stack">
-        <section class="panel stack mobile-panel mobile-only settings-panel" :class="{ 'mobile-panel-hidden': activeMobileTab !== 'settings' }">
-        <div class="hero-copy">
-          <h1>Open KOD</h1>
-          <p class="subtitle">
-            An alternative interface for the same device endpoints used by the default KOD app.
-          </p>
-        </div>
-
-        <form class="stack" @submit.prevent="saveBaseUrl">
-          <label>
-            <span class="field-help">Scan the QR code on the KTV display, then paste the server URL here, for example: <code>http://192.168.1.123:8080</code></span>
-            <div class="input-action-row">
-              <input
-                v-model="baseUrlInput"
-                data-test="base-url-input"
-                type="url"
-                placeholder="http://192.168.0.8:8080"
-              />
-              <button data-test="save-base-url" type="button" class="button-emoji" @click="saveBaseUrl">➤</button>
-            </div>
-          </label>
-          <div class="theme-control">
-            <span class="field-help">Light/Dark theme:</span>
-            <button
-              type="button"
-              class="button-secondary theme-toggle"
-              :aria-pressed="isDarkMode"
-              :title="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
-              @click="isDarkMode = !isDarkMode"
-            >
-              {{ isDarkMode ? '☀︎' : '⏾' }}
-            </button>
-          </div>
-          <div class="toggle-text-row">
-            <span class="field-help">Microphones controlled by KOD: </span>
-            <button
-              data-test="mic-controlled-toggle"
-              type="button"
-              class="button-secondary text-toggle"
-              :aria-pressed="micControlledByKod"
-              :title="micControlledByKod ? 'Disable KOD microphone controls' : 'Enable KOD microphone controls'"
-              @click="micControlledByKod = !micControlledByKod"
-            >
-              {{ micControlledByKod ? '✓' : '\u00A0' }}
-            </button>
-          </div>
-          <p class="field-help settings-note">
-            <em>Disclaimer: your device is communicating directly with the karaoke device over a local network, and does not relay data to any external server.</em>
-          </p>
-        </form>
+        <section
+          class="panel stack mobile-panel settings-panel"
+          :class="{
+            'mobile-panel-hidden': activeMobileTab !== 'settings',
+            'desktop-panel-hidden': activeBrowseTab !== 'settings',
+          }"
+        >
+          <SettingsPanel
+            :base-url-input="baseUrlInput"
+            :is-dark-mode="isDarkMode"
+            :mic-controlled-by-kod="micControlledByKod"
+            :report-status="diagnosticsState.reportStatus"
+            :support-email="SUPPORT_EMAIL"
+            note-placement="footer"
+            @download-report="downloadIssueReport"
+            @save-base-url="saveBaseUrl"
+            @update:base-url-input="baseUrlInput = $event"
+            @update:is-dark-mode="isDarkMode = $event"
+            @update:mic-controlled-by-kod="micControlledByKod = $event"
+          />
         </section>
 
-        <section class="panel stack mobile-panel" :class="{ 'mobile-panel-hidden': activeMobileTab !== 'topHits' }">
+        <section
+          class="panel stack mobile-panel"
+          :class="{
+            'mobile-panel-hidden': activeMobileTab !== 'topHits',
+            'desktop-panel-hidden': activeBrowseTab !== 'topHits',
+          }"
+        >
         <div class="section-heading panel-heading">
           <div>
             <h2>Top Hits</h2>
@@ -645,6 +760,7 @@ onBeforeUnmount(() => {
                 </option>
               </select>
             </label>
+            <!--
             <label>
               Sort type
               <select v-model="searchForm.sortType" data-test="search-sort-type">
@@ -653,6 +769,7 @@ onBeforeUnmount(() => {
                 </option>
               </select>
             </label>
+            -->
             <div class="filter-actions">
               <button data-test="search-submit" type="submit" :disabled="searchState.loading">
                 Search
@@ -728,7 +845,7 @@ onBeforeUnmount(() => {
             <button type="button" class="page-arrow page-arrow-prev" @click="goToPreviousPage" :disabled="searchState.page === 0 || searchState.loading">
               ◀
             </button>
-            <span>Page {{ displayPage }}</span>
+            <span>Page {{ displayPage }}<template v-if="searchState.maxPage">/{{ searchState.maxPage }}</template></span>
             <button type="button" class="page-arrow page-arrow-next" @click="goToNextPage" :disabled="searchState.loading">
               ▶
             </button>
@@ -736,7 +853,7 @@ onBeforeUnmount(() => {
           <div class="page-jump-row">
             <label class="page-jump">
               <span>Page:</span>
-              <input v-model.number="pageInput" type="number" min="1" />
+              <input v-model.number="pageInput" type="text" inputmode="numeric" pattern="[0-9]*" />
             </label>
             <button type="button" @click="goToPage" :disabled="searchState.loading">
               Go
@@ -745,7 +862,13 @@ onBeforeUnmount(() => {
         </div>
         </section>
 
-        <section class="panel stack mobile-panel" :class="{ 'mobile-panel-hidden': activeMobileTab !== 'singer' }">
+        <section
+          class="panel stack mobile-panel"
+          :class="{
+            'mobile-panel-hidden': activeMobileTab !== 'singer',
+            'desktop-panel-hidden': activeBrowseTab !== 'singer',
+          }"
+        >
           <div class="section-heading panel-heading">
             <div>
               <h2>Singer</h2>
@@ -820,17 +943,17 @@ onBeforeUnmount(() => {
                 @click="goToPreviousSingerPage"
                 :disabled="singerState.page === 0 || singerState.loading"
               >
-                â—€
+                ◀
               </button>
-              <span>Page {{ singerDisplayPage }}</span>
+              <span>Page {{ singerDisplayPage }}<template v-if="singerState.maxPage">/{{ singerState.maxPage }}</template></span>
               <button data-test="singer-page-next" type="button" class="page-arrow page-arrow-next" @click="goToNextSingerPage" :disabled="singerState.loading">
-                â–¶
+                ▶
               </button>
             </div>
             <div class="page-jump-row">
               <label class="page-jump">
                 <span>Page:</span>
-                <input v-model.number="singerPageInput" data-test="singer-page-input" type="number" min="1" />
+                <input v-model.number="singerPageInput" data-test="singer-page-input" type="text" inputmode="numeric" pattern="[0-9]*" />
               </label>
               <button type="button" data-test="singer-page-go" @click="goToSingerPage" :disabled="singerState.loading">
                 Go
@@ -844,20 +967,9 @@ onBeforeUnmount(() => {
         <div class="section-heading panel-heading">
           <div>
             <h2>Playlist</h2>
-          </div>
-          <div class="toolbar">
-            <label class="checkbox">
-              <input v-model="autoRefresh" type="checkbox" />
-              Auto refresh
-            </label>
-            <button
-              data-test="refresh-playlist"
-              type="button"
-              @click="refreshPlaylist"
-              :disabled="playlistState.loading"
-            >
-              {{ playlistState.loading ? 'Refreshing...' : 'Refresh' }}
-            </button>
+            <p class="field-help playlist-subtitle">
+              <em>Refreshes automatically every {{ POLL_INTERVAL_MS / 1000 }} seconds.</em>
+            </p>
           </div>
         </div>
 
