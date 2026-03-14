@@ -16,7 +16,7 @@ import {
 
 const POLL_INTERVAL_MS = 5000
 const STORAGE_KEY = 'open-kod-base-url'
-const CLOUD_MARKER = '(\u2601)'
+const CLOUD_MARKER = '\u2601'
 const LANGUAGE_OPTIONS = [
   { label: 'All', value: '\u5168\u90e8' },
   { label: 'Mandarin', value: '\u56fd\u8bed' },
@@ -376,7 +376,6 @@ onBeforeUnmount(() => {
                   <div class="song-meta">
                     <div class="song-title-row">
                       <strong>{{ song.name }}</strong>
-                      <span v-if="song.cloud" class="cloud-marker">{{ CLOUD_MARKER }}</span>
                     </div>
                     <div class="song-artist">{{ song.singer }}</div>
                   </div>
@@ -396,7 +395,7 @@ onBeforeUnmount(() => {
                     class="button-secondary button-command"
                     @click="addSong(song.id)"
                   >
-                    Add
+                    Add<span v-if="song.cloud" class="button-cloud"> ({{ CLOUD_MARKER }})</span>
                   </button>
                 </td>
               </tr>

@@ -261,6 +261,10 @@ th {
   font-size: 0.9rem;
 }
 
+.button-cloud {
+  color: #64748b;
+}
+
 .song-meta {
   display: grid;
   gap: 0.25rem;
