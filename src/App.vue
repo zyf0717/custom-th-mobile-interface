@@ -259,30 +259,32 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="app-shell">
-    <header class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Vue + Vite proof of concept</p>
-        <h1>Open KOD</h1>
-        <p class="subtitle">
-          Search songs, queue tracks, and monitor the current playlist from one page.
-        </p>
-      </div>
-
-      <form class="panel stack" @submit.prevent="saveBaseUrl">
-        <label>
-          Device base URL
-          <input
-            v-model="baseUrlInput"
-            data-test="base-url-input"
-            type="url"
-            placeholder="http://192.168.0.8:8080"
-          />
-        </label>
-        <div class="toolbar">
-          <button data-test="save-base-url" type="button" @click="saveBaseUrl">Save</button>
+    <section class="hero-panel panel">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Vue + Vite proof of concept</p>
+          <h1>Open KOD</h1>
+          <p class="subtitle">
+            Search songs, queue tracks, and monitor the current playlist from one page.
+          </p>
         </div>
-      </form>
-    </header>
+
+        <form class="stack" @submit.prevent="saveBaseUrl">
+          <label>
+            Device base URL
+            <input
+              v-model="baseUrlInput"
+              data-test="base-url-input"
+              type="url"
+              placeholder="http://192.168.0.8:8080"
+            />
+          </label>
+          <div class="toolbar">
+            <button data-test="save-base-url" type="button" @click="saveBaseUrl">Save</button>
+          </div>
+        </form>
+      </header>
+    </section>
 
     <div class="mobile-tabs section-gap" role="tablist" aria-label="Main panels">
       <button

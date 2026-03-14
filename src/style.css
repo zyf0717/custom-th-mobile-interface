@@ -68,6 +68,10 @@ pre {
   padding: 2rem 1rem 7rem;
 }
 
+.hero-panel {
+  margin-bottom: 1rem;
+}
+
 .hero {
   display: grid;
   gap: 1rem;
@@ -84,7 +88,6 @@ pre {
 .hero {
   grid-template-columns: 2fr 1fr;
   align-items: start;
-  margin-bottom: 1rem;
 }
 
 .hero-copy h1,
