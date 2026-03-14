@@ -12,15 +12,18 @@ import {
   queueSong,
   restartDevice,
   searchSongs,
+  skipSong,
   toneDown,
   toneReset,
   toneUp,
+  togglePlay,
   toggleMute,
   toggleVocals,
 } from './lib/kodApi'
 
 const POLL_INTERVAL_MS = 5000
 const STORAGE_KEY = 'open-kod-base-url'
+const THEME_STORAGE_KEY = 'open-kod-theme'
 const CLOUD_MARKER = '\u2601'
 const LANGUAGE_OPTIONS = [
   { label: 'All', value: '\u5168\u90e8' },
@@ -36,6 +39,7 @@ const pageInput = ref(1)
 const activeMobileTab = ref('search')
 const commandBarBusy = ref(false)
 const commandBarRef = ref(null)
+const isDarkMode = ref(window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark')
 
 const searchForm = reactive({
   songName: '',
@@ -255,11 +259,21 @@ function updateCommandBarOffset() {
   document.documentElement.style.setProperty('--command-bar-offset', `${height + 16}px`)
 }
 
+function applyTheme() {
+  document.documentElement.dataset.theme = isDarkMode.value ? 'dark' : 'light'
+  window.localStorage.setItem(THEME_STORAGE_KEY, isDarkMode.value ? 'dark' : 'light')
+}
+
 watch(autoRefresh, () => {
   syncPolling()
 })
 
+watch(isDarkMode, () => {
+  applyTheme()
+})
+
 onMounted(() => {
+  applyTheme()
   syncPolling()
   runSearch()
   refreshPlaylist()
@@ -295,23 +309,35 @@ onBeforeUnmount(() => {
         <div class="hero-copy">
           <h1>Open KOD</h1>
           <p class="subtitle">
-            Search songs, queue tracks, and monitor the current playlist from one page.
+            An alternative interface for the same device endpoints used by the default KOD app.
+          </p>
+          <p class="subtitle">
+            <em>Note: this web app does not send any device data outside your local network.</em>
           </p>
         </div>
 
         <form class="stack" @submit.prevent="saveBaseUrl">
           <label>
-            Device base URL
-            <input
-              v-model="baseUrlInput"
-              data-test="base-url-input"
-              type="url"
-              placeholder="http://192.168.0.8:8080"
-            />
+            <span class="field-help">Scan the QR code on the KTV display, then paste the server URL here, for example: <code>http://192.168.1.123:8080</code></span>
+            <div class="input-action-row">
+              <input
+                v-model="baseUrlInput"
+                data-test="base-url-input"
+                type="url"
+                placeholder="http://192.168.0.8:8080"
+              />
+              <button data-test="save-base-url" type="button" class="button-emoji" @click="saveBaseUrl">➤</button>
+            </div>
           </label>
-          <div class="toolbar">
-            <button data-test="save-base-url" type="button" @click="saveBaseUrl">Save</button>
-          </div>
+          <button
+            type="button"
+            class="button-secondary theme-toggle"
+            :aria-pressed="isDarkMode"
+            :title="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
+            @click="isDarkMode = !isDarkMode"
+          >
+            {{ isDarkMode ? '☀︎' : '⏾' }}
+          </button>
         </form>
       </header>
     </section>
@@ -320,11 +346,11 @@ onBeforeUnmount(() => {
       <button
         type="button"
         class="mobile-tab"
-        :class="{ 'mobile-tab-active': activeMobileTab === 'start' }"
-        :aria-selected="activeMobileTab === 'start'"
-        @click="activeMobileTab = 'start'"
+        :class="{ 'mobile-tab-active': activeMobileTab === 'settings' }"
+        :aria-selected="activeMobileTab === 'settings'"
+        @click="activeMobileTab = 'settings'"
       >
-        Start
+        Settings
       </button>
       <button
         type="button"
@@ -347,27 +373,39 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="main-panels section-gap">
-      <section class="panel stack mobile-panel mobile-only" :class="{ 'mobile-panel-hidden': activeMobileTab !== 'start' }">
+      <section class="panel stack mobile-panel mobile-only" :class="{ 'mobile-panel-hidden': activeMobileTab !== 'settings' }">
         <div class="hero-copy">
           <h1>Open KOD</h1>
           <p class="subtitle">
-            Search songs, queue tracks, and monitor the current playlist from one page.
+            An alternative interface for the same device endpoints used by the default KOD app.
+          </p>
+          <p class="subtitle">
+            <em>Note: this web app does not send any device data outside your local network.</em>
           </p>
         </div>
 
         <form class="stack" @submit.prevent="saveBaseUrl">
           <label>
-            Device base URL
-            <input
-              v-model="baseUrlInput"
-              data-test="base-url-input"
-              type="url"
-              placeholder="http://192.168.0.8:8080"
-            />
+            <span class="field-help">Scan the QR code on the KTV display, then paste the server URL here, for example: <code>http://192.168.1.123:8080</code></span>
+            <div class="input-action-row">
+              <input
+                v-model="baseUrlInput"
+                data-test="base-url-input"
+                type="url"
+                placeholder="http://192.168.0.8:8080"
+              />
+              <button data-test="save-base-url" type="button" class="button-emoji" @click="saveBaseUrl">➤</button>
+            </div>
           </label>
-          <div class="toolbar">
-            <button data-test="save-base-url" type="button" @click="saveBaseUrl">Save</button>
-          </div>
+          <button
+            type="button"
+            class="button-secondary theme-toggle"
+            :aria-pressed="isDarkMode"
+            :title="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
+            @click="isDarkMode = !isDarkMode"
+          >
+            {{ isDarkMode ? '☀︎' : '⏾' }}
+          </button>
         </form>
       </section>
 
@@ -416,15 +454,10 @@ onBeforeUnmount(() => {
           </form>
         </details>
 
+        <p class="results-label">Search results:</p>
+
         <div class="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th></th>
-                <th></th>
-                <th></th>
-              </tr>
-            </thead>
             <tbody v-if="searchState.songs.length">
               <tr v-for="song in searchState.songs" :key="song.id">
                 <td>
@@ -477,16 +510,16 @@ onBeforeUnmount(() => {
         <div class="pagination-stack">
           <div class="pagination-bar">
             <button type="button" @click="goToPreviousPage" :disabled="searchState.page === 0 || searchState.loading">
-              Prev
+              ◀
             </button>
             <span>Page {{ displayPage }}</span>
             <button type="button" @click="goToNextPage" :disabled="searchState.loading">
-              Next
+              ▶
             </button>
           </div>
           <div class="page-jump-row">
             <label class="page-jump">
-              <span>Specify page:</span>
+              <span>Page:</span>
               <input v-model.number="pageInput" type="number" min="1" />
             </label>
             <button type="button" @click="goToPage" :disabled="searchState.loading">
@@ -559,6 +592,12 @@ onBeforeUnmount(() => {
       </button>
       <button data-test="command-vocals" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(toggleVocals)">
         Vocals
+      </button>
+      <button data-test="command-play" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(togglePlay)">
+        ⏯
+      </button>
+      <button data-test="command-skip" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(skipSong)">
+        ⏭
       </button>
       <div class="command-group">
         <span class="command-group-label">Pitch</span>

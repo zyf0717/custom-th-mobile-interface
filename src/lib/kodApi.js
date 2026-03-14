@@ -102,6 +102,14 @@ export async function toggleVocals(baseUrl) {
   return sendCommand(baseUrl, 'MuOr')
 }
 
+export async function togglePlay(baseUrl) {
+  return sendCommand(baseUrl, 'Play')
+}
+
+export async function skipSong(baseUrl) {
+  return sendCommand(baseUrl, 'Skip')
+}
+
 export async function restartDevice(baseUrl) {
   return sendCommand(baseUrl, 'Reset')
 }

@@ -9,14 +9,16 @@ const {
   deleteSong,
   micDown,
   micUp,
-  toggleVocals,
-  restartDevice,
-  toggleMute,
   musicUp,
   musicDown,
+  skipSong,
   toneReset,
   toneDown,
   toneUp,
+  togglePlay,
+  toggleMute,
+  toggleVocals,
+  restartDevice,
 } = vi.hoisted(() => ({
   searchSongs: vi.fn(),
   fetchPlaylist: vi.fn(),
@@ -25,6 +27,8 @@ const {
   deleteSong: vi.fn(),
   toggleVocals: vi.fn(),
   restartDevice: vi.fn(),
+  togglePlay: vi.fn(),
+  skipSong: vi.fn(),
   toggleMute: vi.fn(),
   musicUp: vi.fn(),
   musicDown: vi.fn(),
@@ -46,11 +50,13 @@ vi.mock('./lib/kodApi', () => ({
   queueSong,
   restartDevice,
   searchSongs,
+  skipSong,
   musicDown,
   musicUp,
   toneDown,
   toneReset,
   toneUp,
+  togglePlay,
   toggleMute,
   toggleVocals,
 }))
@@ -102,6 +108,8 @@ describe('App', () => {
     deleteSong.mockReset()
     toggleVocals.mockReset()
     restartDevice.mockReset()
+    togglePlay.mockReset()
+    skipSong.mockReset()
     toggleMute.mockReset()
     musicUp.mockReset()
     musicDown.mockReset()
@@ -118,6 +126,8 @@ describe('App', () => {
     deleteSong.mockResolvedValue({ cmd: 'Del1', code: '0' })
     toggleVocals.mockResolvedValue({ cmd: 'MuOr', code: '0' })
     restartDevice.mockResolvedValue({ cmd: 'Reset', code: '0' })
+    togglePlay.mockResolvedValue({ cmd: 'Play', code: '0' })
+    skipSong.mockResolvedValue({ cmd: 'Skip', code: '0' })
     toggleMute.mockResolvedValue({ cmd: 'Mute', code: '0' })
     musicUp.mockResolvedValue({ cmd: 'Music_up', code: '0' })
     musicDown.mockResolvedValue({ cmd: 'Music_down', code: '0' })
@@ -258,6 +268,32 @@ describe('App', () => {
     await flushPromises()
 
     expect(toggleMute).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(fetchPlaylist).toHaveBeenCalledTimes(2)
+
+    wrapper.unmount()
+  })
+
+  it('sends play from the command bar and refreshes the playlist', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="command-play"]').trigger('click')
+    await flushPromises()
+
+    expect(togglePlay).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(fetchPlaylist).toHaveBeenCalledTimes(2)
+
+    wrapper.unmount()
+  })
+
+  it('sends skip from the command bar and refreshes the playlist', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="command-skip"]').trigger('click')
+    await flushPromises()
+
+    expect(skipSong).toHaveBeenCalledWith('http://192.168.0.8:8080')
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()

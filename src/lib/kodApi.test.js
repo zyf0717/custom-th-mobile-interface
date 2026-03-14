@@ -13,9 +13,11 @@ import {
   queueSong,
   restartDevice,
   searchSongs,
+  skipSong,
   toneDown,
   toneReset,
   toneUp,
+  togglePlay,
   toggleMute,
   toggleVocals,
 } from './kodApi'
@@ -210,6 +212,30 @@ describe('kodApi', () => {
     resolveJsonpRequest({ cmd: 'MuOr', code: '0' })
 
     await expect(commandPromise).resolves.toEqual({ cmd: 'MuOr', code: '0' })
+  })
+
+  it('sends the Play command without a song id', async () => {
+    const commandPromise = togglePlay(DEFAULT_BASE_URL)
+    const requestUrl = new URL(getInjectedScript().src)
+
+    expect(requestUrl.pathname).toBe('/CommandServlet')
+    expect(requestUrl.searchParams.get('cmd')).toBe('Play')
+
+    resolveJsonpRequest({ cmd: 'Play', code: '0' })
+
+    await expect(commandPromise).resolves.toEqual({ cmd: 'Play', code: '0' })
+  })
+
+  it('sends the Skip command without a song id', async () => {
+    const commandPromise = skipSong(DEFAULT_BASE_URL)
+    const requestUrl = new URL(getInjectedScript().src)
+
+    expect(requestUrl.pathname).toBe('/CommandServlet')
+    expect(requestUrl.searchParams.get('cmd')).toBe('Skip')
+
+    resolveJsonpRequest({ cmd: 'Skip', code: '0' })
+
+    await expect(commandPromise).resolves.toEqual({ cmd: 'Skip', code: '0' })
   })
 
   it('sends the Reset command without a song id', async () => {
