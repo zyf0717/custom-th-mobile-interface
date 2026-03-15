@@ -36,6 +36,14 @@ defineProps({
     type: String,
     default: '',
   },
+  connectStatus: {
+    type: String,
+    default: '',
+  },
+  connectPending: {
+    type: Boolean,
+    default: false,
+  },
   supportEmail: {
     type: String,
     required: true,
@@ -284,6 +292,9 @@ onBeforeUnmount(() => {
             <button data-test="save-base-url" type="button" class="button-emoji" @click="$emit('save-base-url')">➤</button>
           </div>
         </label>
+        <p v-if="connectPending || connectStatus" data-test="connect-status" class="field-help settings-status">
+          {{ connectPending ? 'Waiting for local network permission...' : connectStatus }}
+        </p>
 
         <div class="theme-control">
           <span class="field-help">Toggle to override auto-theme:</span>

@@ -4,6 +4,7 @@ import packageJson from '../package.json'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { reloadPage } from './lib/browserLocation'
 import { resolveBaseUrl } from './lib/baseUrl'
+import { requestLocalNetworkAccess } from './lib/localNetworkAccess'
 import {
   deleteSong,
   fetchPlaylist,
@@ -104,6 +105,8 @@ const themeOverride = ref(null)
 const isDarkMode = computed(() => themeOverride.value ?? systemPrefersDarkMode.value)
 const micControlledByKod = ref(window.localStorage.getItem(MIC_CONTROL_STORAGE_KEY) === 'true')
 const showMixerControls = ref(false)
+const connectStatus = ref('')
+const connectPending = ref(false)
 
 const searchForm = reactive({
   songName: '',
@@ -203,6 +206,48 @@ function syncBaseUrlQuery(value) {
 
 function reloadIntoPrimaryTab() {
   reloadPage()
+}
+
+function clearConnectStatus() {
+  connectStatus.value = ''
+}
+
+function getLocalNetworkAccessMessage() {
+  const siteLabel = window.location.hostname || window.location.origin
+  return `Allow ${siteLabel} to access devices on your local network, then try connecting again.`
+}
+
+async function verifyLocalNetworkAccess(baseUrl, options = {}) {
+  const { showErrorInConnectPanel = true, switchToSetupOnFailure = false } = options
+
+  connectPending.value = true
+
+  if (showErrorInConnectPanel) {
+    clearConnectStatus()
+  }
+
+  try {
+    await requestLocalNetworkAccess(baseUrl)
+    return true
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    if (showErrorInConnectPanel) {
+      connectStatus.value = getLocalNetworkAccessMessage()
+    }
+
+    if (switchToSetupOnFailure) {
+      activeMobileTab.value = 'settings'
+      activeBrowseTab.value = 'settings'
+    }
+
+    setLastError(message)
+    setLastResponse('Local network access check failed')
+    logDiagnosticEvent(`Local network access check failed for ${baseUrl}: ${message}`)
+    return false
+  } finally {
+    connectPending.value = false
+  }
 }
 
 function logDiagnosticEvent(message) {
@@ -614,21 +659,64 @@ function goToPage() {
   runSearch()
 }
 
-function saveResolvedBaseUrl(nextBaseUrl = baseUrlInput.value) {
+async function saveResolvedBaseUrl(nextBaseUrl = baseUrlInput.value) {
   const trimmedBaseUrl = nextBaseUrl.trim()
-  activeBaseUrl.value = resolveBaseUrl(nextBaseUrl)
-  baseUrlInput.value = activeBaseUrl.value
-  syncBaseUrlQuery(baseUrlInput.value)
-  logDiagnosticEvent(trimmedBaseUrl ? `Base URL saved: ${activeBaseUrl.value}` : 'Base URL cleared')
+  const resolvedBaseUrl = resolveBaseUrl(nextBaseUrl)
+
+  baseUrlInput.value = resolvedBaseUrl
+
+  if (!resolvedBaseUrl) {
+    activeBaseUrl.value = ''
+    clearConnectStatus()
+    syncBaseUrlQuery('')
+    logDiagnosticEvent(trimmedBaseUrl ? `Base URL saved: ${resolvedBaseUrl}` : 'Base URL cleared')
+    reloadIntoPrimaryTab()
+    return
+  }
+
+  const hasLocalNetworkAccess = await verifyLocalNetworkAccess(resolvedBaseUrl)
+
+  if (!hasLocalNetworkAccess) {
+    return
+  }
+
+  clearConnectStatus()
+  activeBaseUrl.value = resolvedBaseUrl
+  syncBaseUrlQuery(resolvedBaseUrl)
+  logDiagnosticEvent(`Base URL saved: ${resolvedBaseUrl}`)
   reloadIntoPrimaryTab()
 }
 
-function saveBaseUrl() {
-  saveResolvedBaseUrl(baseUrlInput.value)
+async function saveBaseUrl() {
+  await saveResolvedBaseUrl(baseUrlInput.value)
 }
 
-function handleScannedBaseUrl(scannedBaseUrl) {
-  saveResolvedBaseUrl(scannedBaseUrl)
+async function handleScannedBaseUrl(scannedBaseUrl) {
+  await saveResolvedBaseUrl(scannedBaseUrl)
+}
+
+async function initializeDeviceAccess() {
+  if (!hasConfiguredBaseUrl()) {
+    syncPolling()
+    runSearch()
+    runSingerSearch()
+    refreshPlaylist()
+    return
+  }
+
+  const hasLocalNetworkAccess = await verifyLocalNetworkAccess(activeBaseUrl.value, {
+    showErrorInConnectPanel: true,
+    switchToSetupOnFailure: true,
+  })
+
+  if (!hasLocalNetworkAccess) {
+    return
+  }
+
+  syncPolling()
+  runSearch()
+  runSingerSearch()
+  refreshPlaylist()
 }
 
 function syncPolling() {
@@ -679,10 +767,7 @@ onMounted(() => {
   }
 
   logDiagnosticEvent('Session started')
-  syncPolling()
-  runSearch()
-  runSingerSearch()
-  refreshPlaylist()
+  void initializeDeviceAccess()
   updateCommandBarOffset()
 
   if (typeof ResizeObserver !== 'undefined' && commandBarRef.value) {
@@ -799,6 +884,8 @@ onBeforeUnmount(() => {
         >
           <SettingsPanel
             :base-url-input="baseUrlInput"
+            :connect-pending="connectPending"
+            :connect-status="connectStatus"
             :is-dark-mode="isDarkMode"
             :mic-controlled-by-kod="micControlledByKod"
             :report-status="diagnosticsState.reportStatus"

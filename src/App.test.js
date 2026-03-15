@@ -36,6 +36,7 @@ const {
   matchMedia,
   matchMediaAddEventListener,
   matchMediaRemoveEventListener,
+  requestLocalNetworkAccess,
 } = vi.hoisted(() => ({
   searchSongs: vi.fn(),
   fetchPlaylist: vi.fn(),
@@ -70,6 +71,7 @@ const {
   matchMedia: vi.fn(),
   matchMediaAddEventListener: vi.fn(),
   matchMediaRemoveEventListener: vi.fn(),
+  requestLocalNetworkAccess: vi.fn(),
 }))
 
 const TEST_BASE_URL = 'http://10.0.0.20:8080'
@@ -97,6 +99,10 @@ vi.mock('./lib/kodApi', () => ({
 
 vi.mock('./lib/browserLocation', () => ({
   reloadPage: locationReload,
+}))
+
+vi.mock('./lib/localNetworkAccess', () => ({
+  requestLocalNetworkAccess,
 }))
 
 vi.mock('jsqr', () => ({
@@ -221,6 +227,7 @@ describe('App', () => {
     matchMedia.mockReset()
     matchMediaAddEventListener.mockReset()
     matchMediaRemoveEventListener.mockReset()
+    requestLocalNetworkAccess.mockReset()
 
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
@@ -241,6 +248,7 @@ describe('App', () => {
       addEventListener: matchMediaAddEventListener,
       removeEventListener: matchMediaRemoveEventListener,
     }))
+    requestLocalNetworkAccess.mockResolvedValue(true)
     getUserMedia.mockResolvedValue({
       getTracks: () => [{ stop: stopMediaTrack }],
     })
@@ -827,6 +835,7 @@ describe('App', () => {
 
     expect(window.location.search).toBe('?baseUrl=http%3A%2F%2F10.0.0.20%3A8080')
     expect(locationReload).toHaveBeenCalledTimes(1)
+    expect(requestLocalNetworkAccess).toHaveBeenLastCalledWith('http://10.0.0.20:8080')
 
     wrapper.unmount()
   })
@@ -841,6 +850,7 @@ describe('App', () => {
 
     expect(window.location.search).toBe('?baseUrl=http%3A%2F%2F192.168.0.8%3A8080')
     expect(locationReload).toHaveBeenCalledTimes(1)
+    expect(requestLocalNetworkAccess).toHaveBeenLastCalledWith('http://192.168.0.8:8080')
 
     wrapper.unmount()
   })
@@ -854,6 +864,60 @@ describe('App', () => {
 
     expect(window.location.search).toBe('?baseUrl=http%3A%2F%2F10.0.0.30%3A8080')
     expect(locationReload).toHaveBeenCalledTimes(1)
+    expect(requestLocalNetworkAccess).toHaveBeenLastCalledWith('http://10.0.0.30:8080')
+
+    wrapper.unmount()
+  })
+
+  it('shows a local-network guidance message and skips reload when access is blocked while saving', async () => {
+    window.history.replaceState({}, '', '/')
+    requestLocalNetworkAccess.mockRejectedValueOnce(new Error('Permission denied'))
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="base-url-input"]').setValue('http://10.0.0.25:8080')
+    await wrapper.get('[data-test="save-base-url"]').trigger('click')
+    await flushPromises()
+
+    expect(locationReload).not.toHaveBeenCalled()
+    expect(window.location.search).toBe('')
+    expect(wrapper.get('[data-test="connect-status"]').text()).toContain('access devices on your local network')
+
+    wrapper.unmount()
+  })
+
+  it('prompts for local-network access on startup before loading local API data', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+
+    expect(requestLocalNetworkAccess).toHaveBeenCalledWith(TEST_BASE_URL)
+    expect(searchSongs).toHaveBeenCalledWith(
+      TEST_BASE_URL,
+      expect.objectContaining({ page: 0 }),
+    )
+    expect(fetchPlaylist).toHaveBeenCalledWith(TEST_BASE_URL)
+    expect(fetchSingers).toHaveBeenCalledWith(
+      TEST_BASE_URL,
+      expect.objectContaining({ page: 0 }),
+    )
+
+    wrapper.unmount()
+  })
+
+  it('returns to setup and avoids local API calls when startup access is blocked', async () => {
+    requestLocalNetworkAccess.mockRejectedValueOnce(new Error('Permission denied'))
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+
+    expect(searchSongs).not.toHaveBeenCalled()
+    expect(fetchPlaylist).not.toHaveBeenCalled()
+    expect(fetchSingers).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-test="connect-status"]').text()).toContain('access devices on your local network')
+    expect(wrapper.findAll('button.mobile-tab')[0].classes()).toContain('mobile-tab-active')
 
     wrapper.unmount()
   })
