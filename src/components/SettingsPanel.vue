@@ -17,7 +17,7 @@ const SUPPORT_EMAIL_BODY = encodeURIComponent(
 )
 
 const DISCLAIMER_TEXT =
-  'Disclaimer: through this web app, your device is communicating directly with the karaoke device over a local network, and does not relay data to any external server.'
+  'Disclaimer: through this app, your device is communicating directly with the karaoke device over a local network, and does not communicate with any external server.'
 
 defineProps({
   baseUrlInput: {
@@ -245,6 +245,9 @@ onBeforeUnmount(() => {
       </div>
       <p class="subtitle">
         An alternative interface for the same device endpoints used by the default KOD app.
+      </p>
+      <p class="field-help">
+        <strong>NOTE:</strong> This app currently does not work on iOS due to local network access issues.
       </p>
     </section>
 

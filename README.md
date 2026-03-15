@@ -43,6 +43,12 @@ http://device-ip:8080
 
 In the UI, you can usually get this from the QR code shown by the karaoke system.
 
+## Permissions
+
+- Camera access is only needed if you use the QR scanner.
+- On Android Chrome, the browser may ask for permission to access devices on the local network before the app can talk to the KTV box.
+- On iOS, browsers do not expose the same browser-level local-network permission flow for this web app, so direct access to the KTV device fails even when the same setup works on Android.
+
 ## How It Works
 
 Open KOD uses the same browser-facing endpoints as the stock device UI:
@@ -77,5 +83,4 @@ The currently known API behavior, discovered from the stock UI and live endpoint
 ## Notes
 
 - This app is designed for local-network use.
-- If the app is hosted over `https` but the karaoke device only exposes `http`, browsers may block device requests as mixed content.
-- Opening the built app directly from `file://` is not recommended; serve it over HTTP with Vite preview or another static server.
+- iOS browser support for direct local-network device access is more limited than Android Chrome, resulting in failure to connect to the KTV box on iOS.
