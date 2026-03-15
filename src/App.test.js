@@ -21,9 +21,21 @@ const {
   toggleMute,
   toggleVocals,
   restartDevice,
+  decodeQrCode,
   createObjectUrl,
   revokeObjectUrl,
   anchorClick,
+  getUserMedia,
+  stopMediaTrack,
+  videoPlay,
+  videoPause,
+  locationReload,
+  canvasDrawImage,
+  canvasGetImageData,
+  canvasGetContext,
+  matchMedia,
+  matchMediaAddEventListener,
+  matchMediaRemoveEventListener,
 } = vi.hoisted(() => ({
   searchSongs: vi.fn(),
   fetchPlaylist: vi.fn(),
@@ -43,13 +55,26 @@ const {
   toneReset: vi.fn(),
   toneDown: vi.fn(),
   toneUp: vi.fn(),
+  decodeQrCode: vi.fn(),
   createObjectUrl: vi.fn(),
   revokeObjectUrl: vi.fn(),
   anchorClick: vi.fn(),
+  getUserMedia: vi.fn(),
+  stopMediaTrack: vi.fn(),
+  videoPlay: vi.fn(),
+  videoPause: vi.fn(),
+  locationReload: vi.fn(),
+  canvasDrawImage: vi.fn(),
+  canvasGetImageData: vi.fn(),
+  canvasGetContext: vi.fn(),
+  matchMedia: vi.fn(),
+  matchMediaAddEventListener: vi.fn(),
+  matchMediaRemoveEventListener: vi.fn(),
 }))
 
+const TEST_BASE_URL = 'http://10.0.0.20:8080'
+
 vi.mock('./lib/kodApi', () => ({
-  DEFAULT_BASE_URL: 'http://192.168.0.8:8080',
   deleteSong,
   fetchPlaylist,
   fetchSingers,
@@ -68,6 +93,14 @@ vi.mock('./lib/kodApi', () => ({
   togglePlay,
   toggleMute,
   toggleVocals,
+}))
+
+vi.mock('./lib/browserLocation', () => ({
+  reloadPage: locationReload,
+}))
+
+vi.mock('jsqr', () => ({
+  default: decodeQrCode,
 }))
 
 import App from './App.vue'
@@ -127,8 +160,29 @@ function buildSingerResponse() {
   }
 }
 
+function buildEmptySearchResponse() {
+  return {
+    page: 0,
+    maxPage: null,
+    number: 0,
+    songs: [],
+    raw: { page: 0 },
+  }
+}
+
+function buildEmptySingerResponse() {
+  return {
+    page: 0,
+    maxPage: null,
+    number: 0,
+    singers: [],
+    raw: { page: 0 },
+  }
+}
+
 describe('App', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', `/?baseUrl=${encodeURIComponent(TEST_BASE_URL)}`)
     window.localStorage.clear()
     URL.createObjectURL = createObjectUrl
     URL.revokeObjectURL = revokeObjectUrl
@@ -152,9 +206,53 @@ describe('App', () => {
     toneReset.mockReset()
     toneDown.mockReset()
     toneUp.mockReset()
+    decodeQrCode.mockReset()
     createObjectUrl.mockReset()
     revokeObjectUrl.mockReset()
     anchorClick.mockReset()
+    getUserMedia.mockReset()
+    stopMediaTrack.mockReset()
+    videoPlay.mockReset()
+    videoPause.mockReset()
+    locationReload.mockReset()
+    canvasDrawImage.mockReset()
+    canvasGetImageData.mockReset()
+    canvasGetContext.mockReset()
+    matchMedia.mockReset()
+    matchMediaAddEventListener.mockReset()
+    matchMediaRemoveEventListener.mockReset()
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia,
+      },
+    })
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: matchMedia,
+    })
+    HTMLMediaElement.prototype.play = videoPlay
+    HTMLMediaElement.prototype.pause = videoPause
+    HTMLCanvasElement.prototype.getContext = canvasGetContext
+    videoPlay.mockResolvedValue()
+    matchMedia.mockImplementation(() => ({
+      matches: false,
+      addEventListener: matchMediaAddEventListener,
+      removeEventListener: matchMediaRemoveEventListener,
+    }))
+    getUserMedia.mockResolvedValue({
+      getTracks: () => [{ stop: stopMediaTrack }],
+    })
+    canvasGetContext.mockReturnValue({
+      drawImage: canvasDrawImage,
+      getImageData: canvasGetImageData,
+    })
+    canvasGetImageData.mockReturnValue({
+      data: new Uint8ClampedArray(4),
+      width: 1,
+      height: 1,
+    })
 
     searchSongs.mockResolvedValue(buildSearchResponse())
     fetchPlaylist.mockResolvedValue(buildPlaylistResponse())
@@ -174,6 +272,7 @@ describe('App', () => {
     toneReset.mockResolvedValue({ cmd: 'Tone_nom', code: '0' })
     toneDown.mockResolvedValue({ cmd: 'Tone_down', code: '0' })
     toneUp.mockResolvedValue({ cmd: 'Tone_up', code: '0' })
+    decodeQrCode.mockReturnValue(null)
     createObjectUrl.mockReturnValue('blob:open-kod-report')
   })
 
@@ -198,7 +297,7 @@ describe('App', () => {
     await flushPromises()
 
     const image = wrapper.get('img.singer-icon')
-    expect(image.attributes('src')).toBe('http://192.168.0.8:8080/singer/26940.jpg')
+    expect(image.attributes('src')).toBe(`${TEST_BASE_URL}/singer/26940.jpg`)
 
     wrapper.unmount()
   })
@@ -233,6 +332,56 @@ describe('App', () => {
     expect(wrapper.text()).toContain('Singer')
     expect(mobilePanels[2].classes()).not.toContain('mobile-panel-hidden')
     expect(mobilePanels[0].classes()).toContain('mobile-panel-hidden')
+
+    wrapper.unmount()
+  })
+
+  it('offers a path back to setup from empty top hits results', async () => {
+    window.history.replaceState({}, '', '/?baseUrl=http%3A%2F%2F10.0.0.20%3A8080')
+    searchSongs.mockResolvedValue(buildEmptySearchResponse())
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+    const mobilePanels = wrapper.findAll('section.mobile-panel')
+    await wrapper.get('[data-test="top-hits-go-setup"]').trigger('click')
+
+    expect(mobilePanels[0].classes()).not.toContain('mobile-panel-hidden')
+    expect(mobilePanels[1].classes()).toContain('mobile-panel-hidden')
+
+    wrapper.unmount()
+  })
+
+  it('offers a path back to setup from empty singer results', async () => {
+    window.history.replaceState({}, '', '/?baseUrl=http%3A%2F%2F10.0.0.20%3A8080')
+    fetchSingers.mockResolvedValue(buildEmptySingerResponse())
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+    const mobilePanels = wrapper.findAll('section.mobile-panel')
+    await wrapper.findAll('button.mobile-tab')[2].trigger('click')
+    await wrapper.get('[data-test="singer-go-setup"]').trigger('click')
+
+    expect(mobilePanels[0].classes()).not.toContain('mobile-panel-hidden')
+    expect(mobilePanels[2].classes()).toContain('mobile-panel-hidden')
+
+    wrapper.unmount()
+  })
+
+  it('starts on setup when there is no base URL query param', async () => {
+    window.history.replaceState({}, '', '/')
+    const wrapper = mount(App)
+
+    await flushPromises()
+
+    expect(searchSongs).not.toHaveBeenCalled()
+    expect(fetchPlaylist).not.toHaveBeenCalled()
+    expect(fetchSingers).not.toHaveBeenCalled()
+
+    const mobilePanels = wrapper.findAll('section.mobile-panel')
+    expect(mobilePanels[0].classes()).not.toContain('mobile-panel-hidden')
+    expect(mobilePanels[1].classes()).toContain('mobile-panel-hidden')
 
     wrapper.unmount()
   })
@@ -282,7 +431,7 @@ describe('App', () => {
     await flushPromises()
 
     expect(fetchSingers).toHaveBeenLastCalledWith(
-      'http://192.168.0.8:8080',
+      TEST_BASE_URL,
       expect.objectContaining({ page: 1, singerType: '\u5168\u90e8' }),
     )
     expect(wrapper.text()).toContain('\u8c2d\u548f\u9e9f')
@@ -301,7 +450,7 @@ describe('App', () => {
     await flushPromises()
 
     expect(fetchSingers).toHaveBeenLastCalledWith(
-      'http://192.168.0.8:8080',
+      TEST_BASE_URL,
       expect.objectContaining({
         singer: '\u5468',
         singerType: '\u5927\u9646',
@@ -340,7 +489,7 @@ describe('App', () => {
     await flushPromises()
 
     expect(fetchSingers).toHaveBeenLastCalledWith(
-      'http://192.168.0.8:8080',
+      TEST_BASE_URL,
       expect.objectContaining({ page: 1, singerType: '\u5168\u90e8' }),
     )
     expect(wrapper.text()).toContain('\u8c2d\u548f\u9e9f')
@@ -359,7 +508,7 @@ describe('App', () => {
 
     expect(wrapper.get('[data-test="search-singer"]').element.value).toBe('\u5468\u6770\u4f26')
     expect(searchSongs).toHaveBeenLastCalledWith(
-      'http://192.168.0.8:8080',
+      TEST_BASE_URL,
       expect.objectContaining({
         singer: '\u5468\u6770\u4f26',
         songName: '',
@@ -382,7 +531,7 @@ describe('App', () => {
     await wrapper.get('[data-test="add-song-9029901"]').trigger('click')
     await flushPromises()
 
-    expect(queueSong).toHaveBeenCalledWith('http://192.168.0.8:8080', '9029901')
+    expect(queueSong).toHaveBeenCalledWith(TEST_BASE_URL, '9029901')
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -398,7 +547,7 @@ describe('App', () => {
     await flushPromises()
 
     expect(searchSongs).toHaveBeenLastCalledWith(
-      'http://192.168.0.8:8080',
+      TEST_BASE_URL,
       expect.objectContaining({
         singer: 'Eason',
         page: 0,
@@ -415,7 +564,7 @@ describe('App', () => {
     await wrapper.get('[data-test="promote-song-9029901"]').trigger('click')
     await flushPromises()
 
-    expect(prioritizeSong).toHaveBeenCalledWith('http://192.168.0.8:8080', '9029901')
+    expect(prioritizeSong).toHaveBeenCalledWith(TEST_BASE_URL, '9029901')
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -428,7 +577,7 @@ describe('App', () => {
     await wrapper.get('[data-test="delete-song-1486462"]').trigger('click')
     await flushPromises()
 
-    expect(deleteSong).toHaveBeenCalledWith('http://192.168.0.8:8080', '1486462')
+    expect(deleteSong).toHaveBeenCalledWith(TEST_BASE_URL, '1486462')
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -441,7 +590,7 @@ describe('App', () => {
     await wrapper.get('[data-test="playlist-promote-song-1486462"]').trigger('click')
     await flushPromises()
 
-    expect(prioritizeSong).toHaveBeenCalledWith('http://192.168.0.8:8080', '1486462')
+    expect(prioritizeSong).toHaveBeenCalledWith(TEST_BASE_URL, '1486462')
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -454,7 +603,7 @@ describe('App', () => {
     await wrapper.get('[data-test="command-vocals"]').trigger('click')
     await flushPromises()
 
-    expect(toggleVocals).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(toggleVocals).toHaveBeenCalledWith(TEST_BASE_URL)
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -467,7 +616,7 @@ describe('App', () => {
     await wrapper.get('[data-test="command-mute"]').trigger('click')
     await flushPromises()
 
-    expect(toggleMute).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(toggleMute).toHaveBeenCalledWith(TEST_BASE_URL)
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -480,7 +629,7 @@ describe('App', () => {
     await wrapper.get('[data-test="command-play"]').trigger('click')
     await flushPromises()
 
-    expect(togglePlay).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(togglePlay).toHaveBeenCalledWith(TEST_BASE_URL)
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -493,7 +642,7 @@ describe('App', () => {
     await wrapper.get('[data-test="command-skip"]').trigger('click')
     await flushPromises()
 
-    expect(skipSong).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(skipSong).toHaveBeenCalledWith(TEST_BASE_URL)
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -506,7 +655,7 @@ describe('App', () => {
     await wrapper.get('[data-test="command-tone-reset"]').trigger('click')
     await flushPromises()
 
-    expect(toneReset).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(toneReset).toHaveBeenCalledWith(TEST_BASE_URL)
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -521,7 +670,7 @@ describe('App', () => {
     await wrapper.get('[data-test="command-mic-up"]').trigger('click')
     await flushPromises()
 
-    expect(micUp).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(micUp).toHaveBeenCalledWith(TEST_BASE_URL)
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -536,7 +685,7 @@ describe('App', () => {
     await wrapper.get('[data-test="command-mic-down"]').trigger('click')
     await flushPromises()
 
-    expect(micDown).toHaveBeenCalledWith('http://192.168.0.8:8080')
+    expect(micDown).toHaveBeenCalledWith(TEST_BASE_URL)
     expect(fetchPlaylist).toHaveBeenCalledTimes(2)
 
     wrapper.unmount()
@@ -580,6 +729,29 @@ describe('App', () => {
     wrapper.unmount()
   })
 
+  it('lets the setup theme toggle override the system theme until reload only', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+
+    expect(document.documentElement.dataset.theme).toBe('light')
+
+    await wrapper.get('[data-test="theme-toggle"]').trigger('click')
+    await flushPromises()
+
+    expect(document.documentElement.dataset.theme).toBe('dark')
+
+    wrapper.unmount()
+
+    const reloadedWrapper = mount(App)
+
+    await flushPromises()
+
+    expect(document.documentElement.dataset.theme).toBe('light')
+
+    reloadedWrapper.unmount()
+  })
+
   it('prevents duplicate global command calls while a command is in flight', async () => {
     let resolveCommand
     toggleMute.mockImplementation(
@@ -612,12 +784,22 @@ describe('App', () => {
     await wrapper.get('[data-test="save-base-url"]').trigger('click')
     await flushPromises()
 
-    expect(window.localStorage.getItem('open-kod-base-url')).toBe('http://10.0.0.20:8080')
-    expect(searchSongs).toHaveBeenLastCalledWith(
-      'http://10.0.0.20:8080',
-      expect.objectContaining({ page: 0 }),
-    )
-    expect(fetchPlaylist).toHaveBeenLastCalledWith('http://10.0.0.20:8080')
+    expect(window.location.search).toBe('?baseUrl=http%3A%2F%2F10.0.0.20%3A8080')
+    expect(locationReload).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('normalizes a saved bare host and port into http in the query string', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="base-url-input"]').setValue('192.168.0.8:8080')
+    await wrapper.get('[data-test="save-base-url"]').trigger('click')
+    await flushPromises()
+
+    expect(window.location.search).toBe('?baseUrl=http%3A%2F%2F192.168.0.8%3A8080')
+    expect(locationReload).toHaveBeenCalledTimes(1)
 
     wrapper.unmount()
   })
@@ -629,22 +811,36 @@ describe('App', () => {
     wrapper.getComponent(SettingsPanel).vm.$emit('scanner-detected-base-url', 'http://10.0.0.30:8080')
     await flushPromises()
 
-    expect(window.localStorage.getItem('open-kod-base-url')).toBe('http://10.0.0.30:8080')
-    expect(searchSongs).toHaveBeenLastCalledWith(
-      'http://10.0.0.30:8080',
-      expect.objectContaining({ page: 0 }),
-    )
-    expect(fetchSingers).toHaveBeenLastCalledWith(
-      'http://10.0.0.30:8080',
-      expect.objectContaining({ page: 0 }),
-    )
-    expect(fetchPlaylist).toHaveBeenLastCalledWith('http://10.0.0.30:8080')
+    expect(window.location.search).toBe('?baseUrl=http%3A%2F%2F10.0.0.30%3A8080')
+    expect(locationReload).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+  })
+
+  it('opens the camera preview without relying on BarcodeDetector', async () => {
+    window.BarcodeDetector = undefined
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="toggle-qr-scanner"]').trigger('click')
+    await flushPromises()
+
+    expect(getUserMedia).toHaveBeenCalledWith({
+      audio: false,
+      video: {
+        facingMode: {
+          ideal: 'environment',
+        },
+      },
+    })
+    expect(wrapper.find('[data-test="qr-scanner-video"]').exists()).toBe(true)
 
     wrapper.unmount()
   })
 
   it('normalizes saved base URLs with a trailing slash before using singer images', async () => {
-    window.localStorage.setItem('open-kod-base-url', 'http://10.0.0.20:8080/')
+    window.history.replaceState({}, '', '/?baseUrl=http%3A%2F%2F10.0.0.20%3A8080%2F')
 
     const wrapper = mount(App)
 
@@ -652,6 +848,39 @@ describe('App', () => {
 
     const image = wrapper.get('img.singer-icon')
     expect(image.attributes('src')).toBe('http://10.0.0.20:8080/singer/26940.jpg')
+
+    wrapper.unmount()
+  })
+
+  it('reads the base URL from the browser query string on load', async () => {
+    window.history.replaceState({}, '', '/?baseUrl=http%3A%2F%2F10.0.0.40%3A8080')
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="base-url-input"]').element.value).toBe('http://10.0.0.40:8080')
+    expect(searchSongs).toHaveBeenLastCalledWith(
+      'http://10.0.0.40:8080',
+      expect.objectContaining({ page: 0 }),
+    )
+    expect(wrapper.findAll('button.mobile-tab')[1].classes()).toContain('mobile-tab-active')
+
+    wrapper.unmount()
+  })
+
+  it('normalizes a bare host and port from the browser query string on load', async () => {
+    window.history.replaceState({}, '', '/?baseUrl=192.168.0.8%3A8080')
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="base-url-input"]').element.value).toBe('http://192.168.0.8:8080')
+    expect(searchSongs).toHaveBeenLastCalledWith(
+      'http://192.168.0.8:8080',
+      expect.objectContaining({ page: 0 }),
+    )
 
     wrapper.unmount()
   })

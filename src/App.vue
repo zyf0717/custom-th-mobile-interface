@@ -2,9 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import packageJson from '../package.json'
 import SettingsPanel from './components/SettingsPanel.vue'
+import { reloadPage } from './lib/browserLocation'
 import { resolveBaseUrl } from './lib/baseUrl'
 import {
-  DEFAULT_BASE_URL,
   deleteSong,
   fetchPlaylist,
   fetchSingers,
@@ -28,8 +28,7 @@ import {
 const POLL_INTERVAL_MS = 5000
 const DIAGNOSTIC_EVENT_LIMIT = 25
 const SUPPORT_EMAIL = 'zyf0717@gmail.com'
-const STORAGE_KEY = 'open-kod-base-url'
-const THEME_STORAGE_KEY = 'open-kod-theme'
+const BASE_URL_QUERY_PARAM = 'baseUrl'
 const MIC_CONTROL_STORAGE_KEY = 'open-kod-mic-controlled'
 const CLOUD_MARKER = '\u2601'
 const LANGUAGE_OPTIONS = [
@@ -90,15 +89,19 @@ const SINGER_COUNTRY_OPTIONS = [
   { label: 'Other', value: '\u5176\u4ed6' },
 ]
 
-const activeBaseUrl = ref(window.localStorage.getItem(STORAGE_KEY) || DEFAULT_BASE_URL)
-const baseUrlInput = ref(activeBaseUrl.value)
+const initialBaseUrl = getBaseUrlFromQuery()
+const initialPrimaryTab = initialBaseUrl ? 'topHits' : 'settings'
+const activeBaseUrl = ref(initialBaseUrl)
+const baseUrlInput = ref(initialBaseUrl)
 const pageInput = ref(1)
 const singerPageInput = ref(1)
-const activeMobileTab = ref('topHits')
-const activeBrowseTab = ref('topHits')
+const activeMobileTab = ref(initialPrimaryTab)
+const activeBrowseTab = ref(initialPrimaryTab)
 const commandBarBusy = ref(false)
 const commandBarRef = ref(null)
-const isDarkMode = ref(window.localStorage.getItem(THEME_STORAGE_KEY) === 'dark')
+const systemPrefersDarkMode = ref(getSystemDarkModePreference())
+const themeOverride = ref(null)
+const isDarkMode = computed(() => themeOverride.value ?? systemPrefersDarkMode.value)
 const micControlledByKod = ref(window.localStorage.getItem(MIC_CONTROL_STORAGE_KEY) === 'true')
 const showMixerControls = ref(false)
 
@@ -146,6 +149,7 @@ const diagnosticsState = reactive({
 let pollHandle = null
 let commandBarResizeObserver = null
 let reportStatusTimeout = null
+let themeMediaQuery = null
 
 const displayPage = computed(() => searchState.page + 1)
 const singerDisplayPage = computed(() => singerState.page + 1)
@@ -163,6 +167,40 @@ function clearSearchForm() {
 function resetSearch() {
   clearSearchForm()
   runSearch()
+}
+
+function hasConfiguredBaseUrl() {
+  return Boolean(activeBaseUrl.value.trim())
+}
+
+function getBaseUrlFromQuery() {
+  const currentUrl = new URL(window.location.href)
+  return resolveBaseUrl(currentUrl.searchParams.get(BASE_URL_QUERY_PARAM) || '')
+}
+
+function getSystemDarkModePreference() {
+  return window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false
+}
+
+function setThemeOverride(nextValue) {
+  themeOverride.value = nextValue
+}
+
+function syncBaseUrlQuery(value) {
+  const currentUrl = new URL(window.location.href)
+  const trimmedValue = value.trim()
+
+  if (trimmedValue) {
+    currentUrl.searchParams.set(BASE_URL_QUERY_PARAM, trimmedValue)
+  } else {
+    currentUrl.searchParams.delete(BASE_URL_QUERY_PARAM)
+  }
+
+  window.history.replaceState({}, '', currentUrl)
+}
+
+function reloadIntoPrimaryTab() {
+  reloadPage()
 }
 
 function logDiagnosticEvent(message) {
@@ -259,14 +297,22 @@ function downloadIssueReport() {
 }
 
 function singerImageUrl(fileName) {
-  if (!fileName) {
+  if (!fileName || !hasConfiguredBaseUrl()) {
     return ''
   }
 
-  return new URL(`singer/${fileName}`, `${resolveBaseUrl(activeBaseUrl.value).replace(/\/+$/, '')}/`).toString()
+  return new URL(`singer/${fileName}`, `${activeBaseUrl.value.replace(/\/+$/, '')}/`).toString()
 }
 
 async function runSearch() {
+  if (!hasConfiguredBaseUrl()) {
+    searchState.loading = false
+    searchState.maxPage = null
+    searchState.songs = []
+    setLastResponse('Search skipped: no base URL configured')
+    return
+  }
+
   searchState.loading = true
 
   try {
@@ -304,6 +350,13 @@ async function refreshPlaylist(force = false) {
     return
   }
 
+  if (!hasConfiguredBaseUrl()) {
+    playlistState.loading = false
+    playlistState.songs = []
+    setLastResponse('Playlist skipped: no base URL configured')
+    return
+  }
+
   playlistState.loading = true
 
   try {
@@ -323,6 +376,14 @@ async function refreshPlaylist(force = false) {
 }
 
 async function runSingerSearch() {
+  if (!hasConfiguredBaseUrl()) {
+    singerState.loading = false
+    singerState.maxPage = null
+    singerState.singers = []
+    setLastResponse('Singer search skipped: no base URL configured')
+    return
+  }
+
   singerState.loading = true
 
   try {
@@ -387,6 +448,10 @@ function setBrowseTab(tab) {
   activeMobileTab.value = tab
 }
 
+function goToSetup() {
+  setBrowseTab('settings')
+}
+
 function goToPreviousSingerPage() {
   if (singerState.page === 0 || singerState.loading) {
     return
@@ -419,7 +484,7 @@ function goToSingerPage() {
 }
 
 async function addSong(songId) {
-  if (!songId) {
+  if (!songId || !hasConfiguredBaseUrl()) {
     return
   }
 
@@ -439,7 +504,7 @@ async function addSong(songId) {
 }
 
 async function promoteSong(songId) {
-  if (!songId) {
+  if (!songId || !hasConfiguredBaseUrl()) {
     return
   }
 
@@ -459,7 +524,7 @@ async function promoteSong(songId) {
 }
 
 async function removeSong(songId) {
-  if (!songId) {
+  if (!songId || !hasConfiguredBaseUrl()) {
     return
   }
 
@@ -479,7 +544,7 @@ async function removeSong(songId) {
 }
 
 async function runGlobalCommand(commandRunner) {
-  if (commandBarBusy.value) {
+  if (commandBarBusy.value || !hasConfiguredBaseUrl()) {
     return
   }
 
@@ -540,13 +605,12 @@ function goToPage() {
 }
 
 function saveResolvedBaseUrl(nextBaseUrl = baseUrlInput.value) {
+  const trimmedBaseUrl = nextBaseUrl.trim()
   activeBaseUrl.value = resolveBaseUrl(nextBaseUrl)
   baseUrlInput.value = activeBaseUrl.value
-  window.localStorage.setItem(STORAGE_KEY, activeBaseUrl.value)
-  logDiagnosticEvent(`Base URL saved: ${activeBaseUrl.value}`)
-  runSearch()
-  runSingerSearch()
-  refreshPlaylist(true)
+  syncBaseUrlQuery(baseUrlInput.value)
+  logDiagnosticEvent(trimmedBaseUrl ? `Base URL saved: ${activeBaseUrl.value}` : 'Base URL cleared')
+  reloadIntoPrimaryTab()
 }
 
 function saveBaseUrl() {
@@ -578,7 +642,10 @@ function updateCommandBarOffset() {
 
 function applyTheme() {
   document.documentElement.dataset.theme = isDarkMode.value ? 'dark' : 'light'
-  window.localStorage.setItem(THEME_STORAGE_KEY, isDarkMode.value ? 'dark' : 'light')
+}
+
+function syncThemePreference(event) {
+  systemPrefersDarkMode.value = event.matches
 }
 
 function saveMicControlPreference() {
@@ -595,6 +662,12 @@ watch(micControlledByKod, () => {
 
 onMounted(() => {
   applyTheme()
+  themeMediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)') ?? null
+
+  if (themeMediaQuery) {
+    themeMediaQuery.addEventListener('change', syncThemePreference)
+  }
+
   logDiagnosticEvent('Session started')
   syncPolling()
   runSearch()
@@ -619,6 +692,10 @@ onBeforeUnmount(() => {
 
   if (commandBarResizeObserver) {
     commandBarResizeObserver.disconnect()
+  }
+
+  if (themeMediaQuery) {
+    themeMediaQuery.removeEventListener('change', syncThemePreference)
   }
 
   clearReportStatus()
@@ -721,7 +798,7 @@ onBeforeUnmount(() => {
             @scanner-detected-base-url="handleScannedBaseUrl"
             @save-base-url="saveBaseUrl"
             @update:base-url-input="baseUrlInput = $event"
-            @update:is-dark-mode="isDarkMode = $event"
+            @update:is-dark-mode="setThemeOverride"
             @update:mic-controlled-by-kod="micControlledByKod = $event"
           />
         </section>
@@ -799,8 +876,8 @@ onBeforeUnmount(() => {
           <table>
             <tbody v-if="searchState.songs.length">
               <tr v-for="song in searchState.songs" :key="song.id">
-                <td>
-                  <div class="singer-cell">
+                <td class="top-hit-main-cell">
+                  <div class="top-hit-row-content">
                     <img
                       v-if="song.singerPic"
                       :src="singerImageUrl(song.singerPic)"
@@ -808,14 +885,12 @@ onBeforeUnmount(() => {
                       class="singer-icon"
                       loading="lazy"
                     />
-                  </div>
-                </td>
-                <td>
-                  <div class="song-meta">
-                    <div class="song-title-row">
-                      <strong>{{ song.name }}</strong>
+                    <div class="song-meta">
+                      <div class="song-title-row">
+                        <strong>{{ song.name }}</strong>
+                      </div>
+                      <div class="song-artist">{{ song.singer }}</div>
                     </div>
-                    <div class="song-artist">{{ song.singer }}</div>
                   </div>
                 </td>
                 <td class="action-cell">
@@ -840,7 +915,20 @@ onBeforeUnmount(() => {
             </tbody>
             <tbody v-else>
               <tr>
-                <td colspan="3" class="empty">No results yet.</td>
+                <td colspan="2" class="empty">
+                  <div class="empty-state">
+                    <span>{{ searchState.loading ? 'Loading songs...' : 'No results yet.' }}</span>
+                    <button
+                      v-if="!searchState.loading"
+                      data-test="top-hits-go-setup"
+                      type="button"
+                      class="button-secondary"
+                      @click="goToSetup"
+                    >
+                      Go to Setup
+                    </button>
+                  </div>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -938,7 +1026,18 @@ onBeforeUnmount(() => {
               </button>
             </li>
           </ul>
-          <p v-else class="empty">{{ singerState.loading ? 'Loading singers...' : 'No singers returned yet.' }}</p>
+          <div v-else class="empty empty-state">
+            <span>{{ singerState.loading ? 'Loading singers...' : 'No singers returned yet.' }}</span>
+            <button
+              v-if="!singerState.loading"
+              data-test="singer-go-setup"
+              type="button"
+              class="button-secondary"
+              @click="goToSetup"
+            >
+              Go to Setup
+            </button>
+          </div>
 
           <div class="pagination-stack">
             <div class="pagination-bar">

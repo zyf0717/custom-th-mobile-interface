@@ -66,7 +66,7 @@ So:
 Example device base URL:
 
 ```text
-http://192.168.0.8:8080
+http://device-ip:8080
 ```
 
 ## SearchServlet

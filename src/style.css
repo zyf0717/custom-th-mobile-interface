@@ -149,6 +149,46 @@ pre {
   align-items: start;
 }
 
+.settings-hero {
+  gap: 1rem;
+}
+
+.settings-form {
+  gap: 1rem;
+}
+
+.settings-block {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+}
+
+.settings-block-intro {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-surface-muted) 88%, transparent), var(--color-surface));
+}
+
+.settings-block-header {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.settings-block-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.settings-kicker {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .main-panels {
   display: grid;
   gap: 1rem;
@@ -506,6 +546,16 @@ th {
   gap: 0.4rem;
 }
 
+.top-hit-main-cell {
+  width: 100%;
+}
+
+.top-hit-row-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .button-cloud {
   color: var(--color-muted);
 }
@@ -613,6 +663,7 @@ th {
   list-style: none;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--color-border);
 }
 
 .singer-list-item + .singer-list-item {
@@ -623,13 +674,12 @@ th {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 0;
+  padding: 0.75rem;
 }
 
 .singer-result-button {
   width: 100%;
   border: 0;
-  padding-inline: 0;
   background: transparent;
   text-align: left;
 }
@@ -650,6 +700,12 @@ th {
 
 .empty {
   color: var(--color-muted);
+}
+
+.empty-state {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
 }
 
 .results-label {

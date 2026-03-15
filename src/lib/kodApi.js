@@ -1,8 +1,10 @@
 const REQUEST_TIMEOUT_MS = 10000
 
-export const DEFAULT_BASE_URL = 'http://192.168.0.8:8080'
-
 function normalizeBaseUrl(baseUrl) {
+  if (!baseUrl?.trim()) {
+    throw new Error('A base URL is required')
+  }
+
   return `${baseUrl.replace(/\/+$/, '')}/`
 }
 

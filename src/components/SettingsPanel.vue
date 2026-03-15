@@ -1,4 +1,5 @@
 <script setup>
+import jsQR from 'jsqr'
 import { nextTick, onBeforeUnmount, ref } from 'vue'
 import { extractBaseUrlFromQrPayload } from '../lib/baseUrl'
 
@@ -59,9 +60,12 @@ const scannerOpen = ref(false)
 const scannerStatus = ref('')
 
 let scannerStream = null
-let scannerDetector = null
 let scannerFrameHandle = null
 let scannerDetectInFlight = false
+let scannerCanvas = null
+let scannerContext = null
+
+const SCAN_INTERVAL_MS = 250
 
 function updateBaseUrlInput(event) {
   emit('update:base-url-input', event.target.value)
@@ -75,17 +79,20 @@ function canUseCameraScanner() {
   return Boolean(
     typeof window !== 'undefined' &&
       typeof navigator !== 'undefined' &&
-      navigator.mediaDevices?.getUserMedia &&
-      window.BarcodeDetector,
+      navigator.mediaDevices?.getUserMedia,
   )
 }
 
-function createBarcodeDetector() {
-  try {
-    return new window.BarcodeDetector({ formats: ['qr_code'] })
-  } catch {
-    return new window.BarcodeDetector()
+function ensureScannerCanvas() {
+  if (!scannerCanvas) {
+    scannerCanvas = document.createElement('canvas')
   }
+
+  if (!scannerContext) {
+    scannerContext = scannerCanvas.getContext('2d', { willReadFrequently: true })
+  }
+
+  return Boolean(scannerContext)
 }
 
 async function toggleScanner() {
@@ -104,8 +111,14 @@ async function startScanner() {
   }
 
   scannerStatus.value = 'Requesting camera access...'
+  scannerOpen.value = true
 
   try {
+    if (!ensureScannerCanvas()) {
+      stopScanner('Camera scanning is not available because this browser cannot read video frames.')
+      return
+    }
+
     scannerStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
@@ -114,8 +127,6 @@ async function startScanner() {
         },
       },
     })
-    scannerDetector = createBarcodeDetector()
-    scannerOpen.value = true
     scannerStatus.value = 'Point the camera at the QR code on the KTV display.'
     await nextTick()
 
@@ -133,7 +144,7 @@ async function startScanner() {
 
 function stopScanner(message = '') {
   if (scannerFrameHandle !== null) {
-    window.cancelAnimationFrame(scannerFrameHandle)
+    window.clearTimeout(scannerFrameHandle)
     scannerFrameHandle = null
   }
 
@@ -143,8 +154,6 @@ function stopScanner(message = '') {
     scannerStream.getTracks().forEach((track) => track.stop())
     scannerStream = null
   }
-
-  scannerDetector = null
 
   if (scannerVideoRef.value) {
     scannerVideoRef.value.pause?.()
@@ -160,24 +169,40 @@ function queueNextScanFrame() {
     return
   }
 
-  scannerFrameHandle = window.requestAnimationFrame(scanCurrentFrame)
+  scannerFrameHandle = window.setTimeout(() => {
+    scannerFrameHandle = null
+    void scanCurrentFrame()
+  }, SCAN_INTERVAL_MS)
 }
 
 async function scanCurrentFrame() {
-  scannerFrameHandle = null
+  if (!scannerOpen.value || scannerDetectInFlight || !scannerVideoRef.value || !ensureScannerCanvas()) {
+    return
+  }
 
-  if (!scannerOpen.value || !scannerDetector || scannerDetectInFlight || !scannerVideoRef.value) {
+  const video = scannerVideoRef.value
+  const width = video.videoWidth
+  const height = video.videoHeight
+
+  if (!width || !height) {
+    queueNextScanFrame()
     return
   }
 
   scannerDetectInFlight = true
 
   try {
-    const detectedCodes = await scannerDetector.detect(scannerVideoRef.value)
-    const detectedCode = detectedCodes.find((code) => typeof code.rawValue === 'string' && code.rawValue.trim())
+    scannerCanvas.width = width
+    scannerCanvas.height = height
+    scannerContext.drawImage(video, 0, 0, width, height)
 
-    if (detectedCode) {
-      const scannedBaseUrl = extractBaseUrlFromQrPayload(detectedCode.rawValue)
+    const imageData = scannerContext.getImageData(0, 0, width, height)
+    const detectedCode = jsQR(imageData.data, width, height, {
+      inversionAttempts: 'attemptBoth',
+    })
+
+    if (detectedCode?.data) {
+      const scannedBaseUrl = extractBaseUrlFromQrPayload(detectedCode.data)
 
       if (scannedBaseUrl) {
         emit('scanner-detected-base-url', scannedBaseUrl)
@@ -205,68 +230,94 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <header class="hero">
-    <div class="hero-copy">
-      <h1>Open KOD</h1>
+  <header class="hero settings-hero">
+    <section class="hero-copy settings-block settings-block-intro">
+      <div class="settings-block-header">
+        <h1>Open KOD</h1>
+      </div>
       <p class="subtitle">
         An alternative interface for the same device endpoints used by the default KOD app.
       </p>
-      <p v-if="notePlacement === 'header'" class="field-help settings-note">
+    </section>
+
+    <section v-if="notePlacement === 'header'" class="settings-block stack">
+      <div class="settings-block-header">
+        <p class="settings-kicker">Disclaimer</p>
+        <h2>Privacy</h2>
+      </div>
+      <p class="field-help settings-note">
         <em>{{ DISCLAIMER_TEXT }}</em>
       </p>
-    </div>
+    </section>
 
-    <form class="stack" @submit.prevent="$emit('save-base-url')">
-      <label>
-        <span class="field-help">Scan the QR code on the KTV display, or paste the server URL here, for example: <code>http://192.168.0.8:8080</code></span>
-        <div class="input-action-row">
-          <input
-            data-test="base-url-input"
-            type="url"
-            placeholder="http://192.168.0.8:8080"
-            :value="baseUrlInput"
-            @input="updateBaseUrlInput"
-          />
-          <button data-test="save-base-url" type="button" class="button-emoji" @click="$emit('save-base-url')">➤</button>
+    <form class="stack settings-form" @submit.prevent="$emit('save-base-url')">
+      <section class="settings-block stack">
+        <div class="settings-block-header">
+          <h2>Connect</h2>
         </div>
-      </label>
-      <div class="scanner-block">
-        <div class="settings-support-actions">
-          <button data-test="toggle-qr-scanner" type="button" class="button-secondary" @click="toggleScanner">
-            {{ scannerOpen ? 'Stop camera scanner' : 'Scan QR with camera' }}
+
+        <div class="stack">
+          <span class="field-help">Scan the QR code on the KTV display:</span>
+          <div class="scanner-block">
+            <div class="settings-support-actions">
+              <button data-test="toggle-qr-scanner" type="button" class="button-secondary" @click="toggleScanner">
+                {{ scannerOpen ? 'Stop camera scanner' : 'Scan QR with camera' }}
+              </button>
+            </div>
+            <div v-if="scannerOpen" class="scanner-preview">
+              <video ref="scannerVideoRef" data-test="qr-scanner-video" autoplay muted playsinline />
+            </div>
+            <p v-if="scannerStatus" class="field-help scanner-status">{{ scannerStatus }}</p>
+          </div>
+        </div>
+
+        <label>
+          <span class="field-help">Or enter the server URL here, for example: <code>http://device-ip:8080</code></span>
+          <div class="input-action-row">
+            <input
+              data-test="base-url-input"
+              type="url"
+              :value="baseUrlInput"
+              @input="updateBaseUrlInput"
+            />
+            <button data-test="save-base-url" type="button" class="button-emoji" @click="$emit('save-base-url')">➤</button>
+          </div>
+        </label>
+
+        <div class="theme-control">
+          <span class="field-help">Theme follows your browser by default. Toggle to override until reload:</span>
+          <button
+            data-test="theme-toggle"
+            type="button"
+            class="button-secondary theme-toggle"
+            :aria-pressed="isDarkMode"
+            :title="isDarkMode ? 'Switch to light theme until reload' : 'Switch to dark theme until reload'"
+            @click="$emit('update:is-dark-mode', !isDarkMode)"
+          >
+            {{ isDarkMode ? '☀︎' : '⏾' }}
           </button>
         </div>
-        <div v-if="scannerOpen" class="scanner-preview">
-          <video ref="scannerVideoRef" data-test="qr-scanner-video" autoplay muted playsinline />
+
+        <div class="toggle-text-row">
+          <span class="field-help">Microphones controlled by KOD: </span>
+          <button
+            data-test="mic-controlled-toggle"
+            type="button"
+            class="button-secondary text-toggle"
+            :aria-pressed="micControlledByKod"
+            :title="micControlledByKod ? 'Disable KOD microphone controls' : 'Enable KOD microphone controls'"
+            @click="$emit('update:mic-controlled-by-kod', !micControlledByKod)"
+          >
+            {{ micControlledByKod ? '✓' : '\u00A0' }}
+          </button>
         </div>
-        <p v-if="scannerStatus" class="field-help scanner-status">{{ scannerStatus }}</p>
-      </div>
-      <div class="theme-control">
-        <span class="field-help">Light/Dark theme:</span>
-        <button
-          type="button"
-          class="button-secondary theme-toggle"
-          :aria-pressed="isDarkMode"
-          :title="isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'"
-          @click="$emit('update:is-dark-mode', !isDarkMode)"
-        >
-          {{ isDarkMode ? '☀︎' : '⏾' }}
-        </button>
-      </div>
-      <div class="toggle-text-row">
-        <span class="field-help">Microphones controlled by KOD: </span>
-        <button
-          data-test="mic-controlled-toggle"
-          type="button"
-          class="button-secondary text-toggle"
-          :aria-pressed="micControlledByKod"
-          :title="micControlledByKod ? 'Disable KOD microphone controls' : 'Enable KOD microphone controls'"
-          @click="$emit('update:mic-controlled-by-kod', !micControlledByKod)"
-        >
-          {{ micControlledByKod ? '✓' : '\u00A0' }}
-        </button>
-      </div>
-      <div class="stack settings-support">
+      </section>
+
+      <section class="settings-block stack settings-support">
+        <div class="settings-block-header">
+          <h2>Need Help?</h2>
+          <p class="field-help">Download a report and send it to support if the app is not behaving as expected.</p>
+        </div>
         <div class="settings-support-actions">
           <button data-test="download-report" type="button" class="button-secondary" @click="$emit('download-report')">
             Download issue report
@@ -277,13 +328,17 @@ onBeforeUnmount(() => {
           <a :href="supportEmailHref(supportEmail)"><code>{{ supportEmail }}</code></a>.
         </p>
         <p v-if="reportStatus" class="field-help settings-status">{{ reportStatus }}</p>
-      </div>
-      <div v-if="notePlacement === 'footer'" class="settings-note-block">
-        <hr class="settings-divider" />
+      </section>
+
+      <section v-if="notePlacement === 'footer'" class="settings-block stack">
+        <div class="settings-block-header">
+          <p class="settings-kicker">Disclaimer</p>
+          <h2>Privacy</h2>
+        </div>
         <p class="field-help settings-note">
           <em>{{ DISCLAIMER_TEXT }}</em>
         </p>
-      </div>
+      </section>
     </form>
   </header>
 </template>

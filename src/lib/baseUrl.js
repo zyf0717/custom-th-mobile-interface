@@ -1,11 +1,15 @@
-import { DEFAULT_BASE_URL } from './kodApi'
-
 const URL_PATTERN = /\bhttps?:\/\/[^\s"'<>]+/i
 const HOST_PATTERN = /\b((?:\d{1,3}\.){3}\d{1,3}|localhost|(?:[a-z0-9-]+\.)+[a-z0-9-]+)(?::(\d{1,5}))?(?:\/[^\s"'<>]*)?/i
 const QUERY_PARAM_KEYS = ['baseUrl', 'baseURL', 'serverUrl', 'serverURL', 'server', 'url', 'host']
 
 export function resolveBaseUrl(value) {
-  return value.trim() || DEFAULT_BASE_URL
+  const trimmedValue = value.trim()
+
+  if (!trimmedValue) {
+    return ''
+  }
+
+  return extractBaseUrlCandidate(trimmedValue) || trimmedValue
 }
 
 export function extractBaseUrlFromQrPayload(rawValue) {

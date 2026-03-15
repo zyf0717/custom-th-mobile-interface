@@ -38,7 +38,7 @@ npm run preview
 The app expects a device base URL such as:
 
 ```text
-http://192.168.0.8:8080
+http://device-ip:8080
 ```
 
 In the UI, you can usually get this from the QR code shown by the karaoke system.

@@ -3,12 +3,16 @@ import { describe, expect, it } from 'vitest'
 import { extractBaseUrlFromQrPayload, resolveBaseUrl } from './baseUrl'
 
 describe('baseUrl helpers', () => {
-  it('resolves an empty base URL back to the default device address', () => {
-    expect(resolveBaseUrl('   ')).toBe('http://192.168.0.8:8080')
+  it('resolves an empty base URL to an empty string', () => {
+    expect(resolveBaseUrl('   ')).toBe('')
+  })
+
+  it('adds http to a bare host and port base URL', () => {
+    expect(resolveBaseUrl('192.168.0.8:8080')).toBe('http://192.168.0.8:8080')
   })
 
   it('extracts the origin from a direct QR URL', () => {
-    expect(extractBaseUrlFromQrPayload('http://192.168.0.8:8080/index.html?room=VIP')).toBe('http://192.168.0.8:8080')
+    expect(extractBaseUrlFromQrPayload('http://device-ip:8080/index.html?room=VIP')).toBe('http://device-ip:8080')
   })
 
   it('extracts a base URL nested inside another setup URL', () => {

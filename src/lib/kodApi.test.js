@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
-  DEFAULT_BASE_URL,
   deleteSong,
   fetchPlaylist,
   fetchSingers,
@@ -23,6 +22,8 @@ import {
   toggleVocals,
 } from './kodApi'
 
+const TEST_BASE_URL = 'http://10.0.0.20:8080'
+
 function getInjectedScript() {
   const script = document.body.querySelector('script')
 
@@ -41,7 +42,7 @@ function resolveJsonpRequest(payload) {
 
 describe('kodApi', () => {
   it('builds a SearchServlet JSONP request and normalizes search results', async () => {
-    const resultPromise = searchSongs(DEFAULT_BASE_URL, {
+    const resultPromise = searchSongs(TEST_BASE_URL, {
       songName: '',
       songType: '',
       singer: '',
@@ -108,7 +109,7 @@ describe('kodApi', () => {
   })
 
   it('preserves singerPic filenames from search responses', async () => {
-    const resultPromise = searchSongs(DEFAULT_BASE_URL, {
+    const resultPromise = searchSongs(TEST_BASE_URL, {
       lang: '\u5168\u90e8',
       page: 0,
     })
@@ -159,10 +160,10 @@ describe('kodApi', () => {
   })
 
   it('uses the base URL correctly when it already has a trailing slash', async () => {
-    const commandPromise = queueSong('http://192.168.0.8:8080/', '9029901')
+    const commandPromise = queueSong(`${TEST_BASE_URL}/`, '9029901')
     const requestUrl = new URL(getInjectedScript().src)
 
-    expect(requestUrl.origin).toBe('http://192.168.0.8:8080')
+    expect(requestUrl.origin).toBe(TEST_BASE_URL)
     expect(requestUrl.pathname).toBe('/CommandServlet')
     expect(requestUrl.searchParams.get('cmdValue')).toBe('9029901')
 
@@ -172,7 +173,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Add1 command with the selected song id', async () => {
-    const commandPromise = queueSong(DEFAULT_BASE_URL, '9029901')
+    const commandPromise = queueSong(TEST_BASE_URL, '9029901')
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -185,7 +186,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Pro1 command with the selected song id', async () => {
-    const commandPromise = prioritizeSong(DEFAULT_BASE_URL, '9029901')
+    const commandPromise = prioritizeSong(TEST_BASE_URL, '9029901')
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -198,7 +199,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Del1 command with the selected song id', async () => {
-    const commandPromise = deleteSong(DEFAULT_BASE_URL, '1673128')
+    const commandPromise = deleteSong(TEST_BASE_URL, '1673128')
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -211,7 +212,7 @@ describe('kodApi', () => {
   })
 
   it('sends the MuOr command without a song id', async () => {
-    const commandPromise = toggleVocals(DEFAULT_BASE_URL)
+    const commandPromise = toggleVocals(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -224,7 +225,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Play command without a song id', async () => {
-    const commandPromise = togglePlay(DEFAULT_BASE_URL)
+    const commandPromise = togglePlay(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -236,7 +237,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Skip command without a song id', async () => {
-    const commandPromise = skipSong(DEFAULT_BASE_URL)
+    const commandPromise = skipSong(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -248,7 +249,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Reset command without a song id', async () => {
-    const commandPromise = restartDevice(DEFAULT_BASE_URL)
+    const commandPromise = restartDevice(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -260,7 +261,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Mute command without a song id', async () => {
-    const commandPromise = toggleMute(DEFAULT_BASE_URL)
+    const commandPromise = toggleMute(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -272,7 +273,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Music_up command without a song id', async () => {
-    const commandPromise = musicUp(DEFAULT_BASE_URL)
+    const commandPromise = musicUp(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -284,7 +285,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Music_down command without a song id', async () => {
-    const commandPromise = musicDown(DEFAULT_BASE_URL)
+    const commandPromise = musicDown(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -296,7 +297,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Mic_up command without a song id', async () => {
-    const commandPromise = micUp(DEFAULT_BASE_URL)
+    const commandPromise = micUp(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -308,7 +309,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Mic_down command without a song id', async () => {
-    const commandPromise = micDown(DEFAULT_BASE_URL)
+    const commandPromise = micDown(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -320,7 +321,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Tone_nom command without a song id', async () => {
-    const commandPromise = toneReset(DEFAULT_BASE_URL)
+    const commandPromise = toneReset(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -332,7 +333,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Tone_down command without a song id', async () => {
-    const commandPromise = toneDown(DEFAULT_BASE_URL)
+    const commandPromise = toneDown(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -344,7 +345,7 @@ describe('kodApi', () => {
   })
 
   it('sends the Tone_up command without a song id', async () => {
-    const commandPromise = toneUp(DEFAULT_BASE_URL)
+    const commandPromise = toneUp(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/CommandServlet')
@@ -356,7 +357,7 @@ describe('kodApi', () => {
   })
 
   it('normalizes playlist data from PlaylistServlet', async () => {
-    const playlistPromise = fetchPlaylist(DEFAULT_BASE_URL)
+    const playlistPromise = fetchPlaylist(TEST_BASE_URL)
     const requestUrl = new URL(getInjectedScript().src)
 
     expect(requestUrl.pathname).toBe('/PlaylistServlet')
@@ -400,7 +401,7 @@ describe('kodApi', () => {
   })
 
   it('normalizes singer data from SingerServlet', async () => {
-    const singerPromise = fetchSingers(DEFAULT_BASE_URL, {
+    const singerPromise = fetchSingers(TEST_BASE_URL, {
       singer: '',
       singerType: '\u5168\u90e8',
       sortType: '',
@@ -447,7 +448,7 @@ describe('kodApi', () => {
   it('rejects JSONP requests that time out', async () => {
     vi.useFakeTimers()
 
-    const requestPromise = jsonp(DEFAULT_BASE_URL, 'SearchServlet', { page: 0 })
+    const requestPromise = jsonp(TEST_BASE_URL, 'SearchServlet', { page: 0 })
     const rejection = expect(requestPromise).rejects.toThrow('Request timed out for SearchServlet')
 
     await vi.advanceTimersByTimeAsync(10000)
