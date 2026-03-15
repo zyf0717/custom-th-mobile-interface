@@ -260,7 +260,8 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="stack">
-          <span class="field-help">Scan the QR code on the KTV display:</span>
+          <span class="field-help">Scan the QR code on the KTV display. Note: Camera scanning may not work on some
+            browsers or operating systems.</span>
           <div class="scanner-block">
             <div class="settings-support-actions">
               <button data-test="toggle-qr-scanner" type="button" class="button-secondary" @click="toggleScanner">

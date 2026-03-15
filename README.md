@@ -44,10 +44,12 @@ http://device-ip:8080
 For best compatibility, serve and open the app over plain `http://` on the same local network as the karaoke device.
 
 In the UI, you can usually get this from the QR code shown by the karaoke system.
+If the QR scanner is unavailable on your browser or OS, enter the server URL manually instead.
 
 ## Permissions
 
 - Camera access is only needed if you use the QR scanner.
+- Camera scanning may not work on some browser and operating system combinations.
 - The app is intended for direct local-network access over plain `http://`, without a backend proxy.
 - Browser behavior can still vary across platforms, but the current app flow no longer depends on an explicit browser-level local-network permission trigger.
 
