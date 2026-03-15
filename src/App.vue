@@ -4,7 +4,6 @@ import packageJson from '../package.json'
 import SettingsPanel from './components/SettingsPanel.vue'
 import { reloadPage } from './lib/browserLocation'
 import { resolveBaseUrl } from './lib/baseUrl'
-import { requestLocalNetworkAccess } from './lib/localNetworkAccess'
 import {
   deleteSong,
   fetchPlaylist,
@@ -31,6 +30,7 @@ const DIAGNOSTIC_EVENT_LIMIT = 25
 const SUPPORT_EMAIL = 'zyf0717@gmail.com'
 const BASE_URL_QUERY_PARAM = 'baseUrl'
 const MIC_CONTROL_STORAGE_KEY = 'open-kod-mic-controlled'
+const LOCAL_NETWORK_PERMISSION_PROMPTS_DISABLED = true
 const CLOUD_MARKER = '\u2601'
 const LANGUAGE_OPTIONS = [
   { label: 'All', value: '' },
@@ -218,6 +218,10 @@ function getLocalNetworkAccessMessage() {
 }
 
 async function verifyLocalNetworkAccess(baseUrl, options = {}) {
+  if (LOCAL_NETWORK_PERMISSION_PROMPTS_DISABLED) {
+    return true
+  }
+
   const { showErrorInConnectPanel = true, switchToSetupOnFailure = false } = options
 
   connectPending.value = true
