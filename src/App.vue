@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import packageJson from '../package.json'
 import SettingsPanel from './components/SettingsPanel.vue'
+import { resolveBaseUrl } from './lib/baseUrl'
 import {
   DEFAULT_BASE_URL,
   deleteSong,
@@ -162,10 +163,6 @@ function clearSearchForm() {
 function resetSearch() {
   clearSearchForm()
   runSearch()
-}
-
-function resolveBaseUrl(value) {
-  return value.trim() || DEFAULT_BASE_URL
 }
 
 function logDiagnosticEvent(message) {
@@ -542,14 +539,22 @@ function goToPage() {
   runSearch()
 }
 
-function saveBaseUrl() {
-  activeBaseUrl.value = resolveBaseUrl(baseUrlInput.value)
+function saveResolvedBaseUrl(nextBaseUrl = baseUrlInput.value) {
+  activeBaseUrl.value = resolveBaseUrl(nextBaseUrl)
   baseUrlInput.value = activeBaseUrl.value
   window.localStorage.setItem(STORAGE_KEY, activeBaseUrl.value)
   logDiagnosticEvent(`Base URL saved: ${activeBaseUrl.value}`)
   runSearch()
   runSingerSearch()
   refreshPlaylist(true)
+}
+
+function saveBaseUrl() {
+  saveResolvedBaseUrl(baseUrlInput.value)
+}
+
+function handleScannedBaseUrl(scannedBaseUrl) {
+  saveResolvedBaseUrl(scannedBaseUrl)
 }
 
 function syncPolling() {
@@ -713,6 +718,7 @@ onBeforeUnmount(() => {
             :support-email="SUPPORT_EMAIL"
             note-placement="footer"
             @download-report="downloadIssueReport"
+            @scanner-detected-base-url="handleScannedBaseUrl"
             @save-base-url="saveBaseUrl"
             @update:base-url-input="baseUrlInput = $event"
             @update:is-dark-mode="isDarkMode = $event"

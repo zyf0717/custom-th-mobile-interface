@@ -58,7 +58,7 @@ select {
 button {
   border: 1px solid var(--color-border-strong);
   border-radius: 8px;
-  padding: 0.6rem 1rem;
+  padding: 0.5rem 0.85rem;
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
@@ -78,7 +78,7 @@ select {
   width: 100%;
   border: 1px solid var(--color-border-strong);
   border-radius: 8px;
-  padding: 0.65rem 0.75rem;
+  padding: 0.55rem 0.65rem;
   background: var(--color-surface);
   color: var(--color-text);
 }
@@ -266,16 +266,16 @@ p {
 }
 
 .theme-toggle {
-  width: 2.5rem;
-  min-width: 2.5rem;
+  width: 2.15rem;
+  min-width: 2.15rem;
   justify-self: start;
   padding-inline: 0;
   text-align: center;
 }
 
 .text-toggle {
-  width: 2.5rem;
-  min-width: 2.5rem;
+  width: 2.15rem;
+  min-width: 2.15rem;
   padding-inline: 0;
   text-align: center;
 }
@@ -307,6 +307,32 @@ p {
   justify-items: start;
 }
 
+.scanner-block {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.scanner-preview {
+  display: grid;
+  width: min(100%, 24rem);
+  padding: 0.75rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+}
+
+.scanner-preview video {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #000;
+}
+
+.scanner-status {
+  margin-top: -0.25rem;
+}
+
 .settings-support-actions {
   display: flex;
   gap: 0.75rem;
@@ -334,14 +360,14 @@ p {
 }
 
 .button-command {
-  min-width: 5.75rem;
-  padding: 0.5rem 0.75rem;
+  min-width: 4.9rem;
+  padding: 0.425rem 0.65rem;
   font-size: 0.875rem;
 }
 
 .button-emoji {
-  min-width: 2.75rem;
-  padding-inline: 0.6rem;
+  min-width: 2.35rem;
+  padding-inline: 0.5rem;
 }
 
 .button-danger {

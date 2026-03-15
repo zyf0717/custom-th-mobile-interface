@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import SettingsPanel from './components/SettingsPanel.vue'
 
 const {
   searchSongs,
@@ -617,6 +618,27 @@ describe('App', () => {
       expect.objectContaining({ page: 0 }),
     )
     expect(fetchPlaylist).toHaveBeenLastCalledWith('http://10.0.0.20:8080')
+
+    wrapper.unmount()
+  })
+
+  it('saves a scanned base URL and reuses it for follow-up requests', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+    wrapper.getComponent(SettingsPanel).vm.$emit('scanner-detected-base-url', 'http://10.0.0.30:8080')
+    await flushPromises()
+
+    expect(window.localStorage.getItem('open-kod-base-url')).toBe('http://10.0.0.30:8080')
+    expect(searchSongs).toHaveBeenLastCalledWith(
+      'http://10.0.0.30:8080',
+      expect.objectContaining({ page: 0 }),
+    )
+    expect(fetchSingers).toHaveBeenLastCalledWith(
+      'http://10.0.0.30:8080',
+      expect.objectContaining({ page: 0 }),
+    )
+    expect(fetchPlaylist).toHaveBeenLastCalledWith('http://10.0.0.30:8080')
 
     wrapper.unmount()
   })
