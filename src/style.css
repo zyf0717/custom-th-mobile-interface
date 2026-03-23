@@ -383,6 +383,18 @@ p {
   margin-top: -0.5rem;
 }
 
+.support-email-link {
+  color: var(--color-text);
+}
+
+.support-email-link:hover {
+  color: var(--color-muted-strong);
+}
+
+.support-email-link code {
+  color: inherit;
+}
+
 .settings-divider {
   width: 100%;
   margin: 0;
@@ -548,6 +560,11 @@ th {
 
 .top-hit-main-cell {
   width: 100%;
+}
+
+.top-hit-action-cell {
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .top-hit-row-content {

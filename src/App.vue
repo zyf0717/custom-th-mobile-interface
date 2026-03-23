@@ -1,23 +1,33 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import packageJson from '../package.json'
+import CommandBar from './components/CommandBar.vue'
 import PlaylistPanel from './components/PlaylistPanel.vue'
 import SingerPanel from './components/SingerPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import TopHitsPanel from './components/TopHitsPanel.vue'
-import { reloadPage } from './lib/browserLocation'
+import { useDiagnostics } from './composables/useDiagnostics'
+import { useFavorites } from './composables/useFavorites'
+import { useKodApi } from './composables/useKodApi'
+import { reloadPage } from './services/browserLocation'
+import {
+  buildDiagnosticsReport as buildDiagnosticsReportText,
+  buildReportFilename,
+  downloadTextFile,
+} from './services/diagnosticsReport'
 import { resolveBaseUrl } from './lib/baseUrl'
 import {
   BASE_URL_QUERY_PARAM,
   CLOUD_MARKER,
   DIAGNOSTIC_EVENT_LIMIT,
+  FAVORITES_STORAGE_KEY,
   LANGUAGE_OPTIONS,
   MIC_CONTROL_STORAGE_KEY,
   POLL_INTERVAL_MS,
   SINGER_COUNTRY_OPTIONS,
   SONG_TYPE_OPTIONS,
   SUPPORT_EMAIL,
-} from './lib/appOptions'
+} from './constants/appOptions'
 import {
   deleteSong,
   fetchPlaylist,
@@ -37,7 +47,7 @@ import {
   togglePlay,
   toggleMute,
   toggleVocals,
-} from './lib/kodApi'
+} from './services/kodApi'
 
 const initialBaseUrl = getBaseUrlFromQuery()
 const initialPrimaryTab = initialBaseUrl ? 'topHits' : 'settings'
@@ -47,7 +57,6 @@ const pageInput = ref(1)
 const singerPageInput = ref(1)
 const activeMobileTab = ref(initialPrimaryTab)
 const activeBrowseTab = ref(initialPrimaryTab)
-const commandBarBusy = ref(false)
 const commandBarRef = ref(null)
 const systemPrefersDarkMode = ref(getSystemDarkModePreference())
 const themeOverride = ref(null)
@@ -89,18 +98,18 @@ const singerState = reactive({
   errorMessage: '',
 })
 
-const diagnosticsState = reactive({
-  lastError: '',
-  lastRequest: '',
-  lastRequestLabel: '',
-  lastResponse: '',
-  reportStatus: '',
-  events: [],
-})
+const {
+  diagnosticsState,
+  logDiagnosticEvent,
+  setLastRequest,
+  setLastResponse,
+  setLastError,
+  setReportStatus,
+  disposeDiagnostics,
+} = useDiagnostics({ eventLimit: DIAGNOSTIC_EVENT_LIMIT })
 
 let pollHandle = null
 let commandBarResizeObserver = null
-let reportStatusTimeout = null
 let themeMediaQuery = null
 
 const displayPage = computed(() => searchState.page + 1)
@@ -155,84 +164,29 @@ function reloadIntoPrimaryTab() {
   reloadPage()
 }
 
-function logDiagnosticEvent(message) {
-  diagnosticsState.events.unshift(`${new Date().toISOString()} ${message}`)
-  diagnosticsState.events.splice(DIAGNOSTIC_EVENT_LIMIT)
-}
-
-function setLastRequest(label, details) {
-  diagnosticsState.lastRequestLabel = label
-  diagnosticsState.lastRequest = details
-}
-
-function setLastResponse(details) {
-  diagnosticsState.lastResponse = details
-}
-
-function setLastError(message) {
-  diagnosticsState.lastError = message
-}
-
-function clearReportStatus() {
-  if (reportStatusTimeout) {
-    window.clearTimeout(reportStatusTimeout)
-    reportStatusTimeout = null
-  }
-}
-
-function setReportStatus(message) {
-  clearReportStatus()
-  diagnosticsState.reportStatus = message
-
-  if (message) {
-    reportStatusTimeout = window.setTimeout(() => {
-      diagnosticsState.reportStatus = ''
-      reportStatusTimeout = null
-    }, 4000)
-  }
-}
-
-function downloadTextFile(filename, text) {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-  const objectUrl = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = objectUrl
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(objectUrl)
-}
-
 function buildDiagnosticsReport() {
-  const lines = [
-    'Open KOD issue report',
-    `Version: ${packageJson.version}`,
-    `Generated: ${new Date().toISOString()}`,
-    `Base URL: ${activeBaseUrl.value}`,
-    `Active mobile tab: ${activeMobileTab.value}`,
-    `Active browse tab: ${activeBrowseTab.value}`,
-    `Theme: ${isDarkMode.value ? 'dark' : 'light'}`,
-    `Mic controlled by KOD: ${micControlledByKod.value ? 'yes' : 'no'}`,
-    `Top Hits filters: title="${searchForm.songName}" singer="${searchForm.singer}" lang="${searchForm.lang}" songType="${searchForm.songType}" sortType="${searchForm.sortType}"`,
-    `Top Hits page: ${displayPage.value}${searchState.maxPage ? `/${searchState.maxPage}` : ''}`,
-    `Singer filters: singer="${singerForm.singer}" country="${singerForm.singerType}"`,
-    `Singer page: ${singerDisplayPage.value}${singerState.maxPage ? `/${singerState.maxPage}` : ''}`,
-    `Playlist items: ${playlistState.songs.length}`,
-    `Last request: ${diagnosticsState.lastRequestLabel || 'n/a'} ${diagnosticsState.lastRequest || ''}`.trim(),
-    `Last response: ${diagnosticsState.lastResponse || 'n/a'}`,
-    `Last error: ${diagnosticsState.lastError || 'none'}`,
-    `User agent: ${navigator.userAgent}`,
-    'Recent events:',
-    ...diagnosticsState.events,
-  ]
-
-  return lines.join('\n')
-}
-
-function buildReportFilename() {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  return `open-kod-issue-report-${stamp}.txt`
+  return buildDiagnosticsReportText({
+    version: packageJson.version,
+    generatedAt: new Date().toISOString(),
+    baseUrl: activeBaseUrl.value,
+    activeMobileTab: activeMobileTab.value,
+    activeBrowseTab: activeBrowseTab.value,
+    isDarkMode: isDarkMode.value,
+    micControlledByKod: micControlledByKod.value,
+    searchForm,
+    displayPage: displayPage.value,
+    searchMaxPage: searchState.maxPage,
+    singerForm,
+    singerDisplayPage: singerDisplayPage.value,
+    singerMaxPage: singerState.maxPage,
+    playlistItemCount: playlistState.songs.length,
+    lastRequestLabel: diagnosticsState.lastRequestLabel,
+    lastRequest: diagnosticsState.lastRequest,
+    lastResponse: diagnosticsState.lastResponse,
+    lastError: diagnosticsState.lastError,
+    userAgent: navigator.userAgent,
+    events: diagnosticsState.events,
+  })
 }
 
 function downloadIssueReport() {
@@ -256,126 +210,37 @@ function singerImageUrl(fileName) {
   return new URL(`singer/${fileName}`, `${activeBaseUrl.value.replace(/\/+$/, '')}/`).toString()
 }
 
-async function runSearch() {
-  if (!hasConfiguredBaseUrl()) {
-    searchState.loading = false
-    searchState.maxPage = null
-    searchState.songs = []
-    searchState.errorMessage = ''
-    setLastResponse('Search skipped: no base URL configured')
-    return
-  }
-
-  searchState.loading = true
-  searchState.errorMessage = ''
-
-  try {
-    setLastRequest(
-      'SearchServlet',
-      `page=${searchState.page} songName="${searchForm.songName.trim()}" singer="${searchForm.singer.trim()}" lang="${searchForm.lang.trim()}" songType="${searchForm.songType.trim()}" sortType="${searchForm.sortType.trim()}"`,
-    )
-    const response = await searchSongs(activeBaseUrl.value, {
-      songName: searchForm.songName.trim(),
-      singer: searchForm.singer.trim(),
-      songType: searchForm.songType.trim(),
-      lang: searchForm.lang.trim(),
-      sortType: searchForm.sortType.trim(),
-      page: searchState.page,
-    })
-
-    searchState.page = response.page
-    searchState.maxPage = response.maxPage
-    pageInput.value = response.page + 1
-    searchState.songs = response.songs
-    searchState.errorMessage = ''
-    setLastResponse(`Search returned ${response.number} result(s), max page ${response.maxPage ?? 'n/a'}`)
-    setLastError('')
-    logDiagnosticEvent(`Search returned ${response.number} result(s)`)
-  } catch (error) {
-    searchState.maxPage = null
-    searchState.songs = []
-    searchState.errorMessage = 'Unable to load songs. Check the server URL in Setup.'
-    setLastError(error instanceof Error ? error.message : String(error))
-    setLastResponse('Search failed')
-    logDiagnosticEvent(`Search failed: ${diagnosticsState.lastError}`)
-    console.error(error)
-  } finally {
-    searchState.loading = false
-  }
-}
-
-async function refreshPlaylist(force = false) {
-  if (playlistState.loading && !force) {
-    return
-  }
-
-  if (!hasConfiguredBaseUrl()) {
-    playlistState.loading = false
-    playlistState.songs = []
-    setLastResponse('Playlist skipped: no base URL configured')
-    return
-  }
-
-  playlistState.loading = true
-
-  try {
-    setLastRequest('PlaylistServlet', 'type=1 onSelectPage=true')
-    const response = await fetchPlaylist(activeBaseUrl.value)
-    playlistState.songs = response.songs
-    setLastResponse(`Playlist returned ${response.number} item(s)`)
-    setLastError('')
-  } catch (error) {
-    setLastError(error instanceof Error ? error.message : String(error))
-    setLastResponse('Playlist refresh failed')
-    logDiagnosticEvent(`Playlist refresh failed: ${diagnosticsState.lastError}`)
-    console.error(error)
-  } finally {
-    playlistState.loading = false
-  }
-}
-
-async function runSingerSearch() {
-  if (!hasConfiguredBaseUrl()) {
-    singerState.loading = false
-    singerState.maxPage = null
-    singerState.singers = []
-    singerState.errorMessage = ''
-    setLastResponse('Singer search skipped: no base URL configured')
-    return
-  }
-
-  singerState.loading = true
-  singerState.errorMessage = ''
-
-  try {
-    setLastRequest('SingerServlet', `page=${singerState.page} singer="${singerForm.singer.trim()}" singerType="${singerForm.singerType}"`)
-    const response = await fetchSingers(activeBaseUrl.value, {
-      singer: singerForm.singer.trim(),
-      singerType: singerForm.singerType,
-      sortType: '',
-      page: singerState.page,
-    })
-
-    singerState.page = response.page
-    singerState.maxPage = response.maxPage
-    singerPageInput.value = response.page + 1
-    singerState.singers = response.singers
-    singerState.errorMessage = ''
-    setLastResponse(`Singer search returned ${response.number} result(s), max page ${response.maxPage ?? 'n/a'}`)
-    setLastError('')
-    logDiagnosticEvent(`Singer search returned ${response.number} result(s)`)
-  } catch (error) {
-    singerState.maxPage = null
-    singerState.singers = []
-    singerState.errorMessage = 'Unable to load singers. Check the server URL in Setup.'
-    setLastError(error instanceof Error ? error.message : String(error))
-    setLastResponse('Singer search failed')
-    logDiagnosticEvent(`Singer search failed: ${diagnosticsState.lastError}`)
-    console.error(error)
-  } finally {
-    singerState.loading = false
-  }
-}
+const {
+  commandBarBusy,
+  runSearch,
+  refreshPlaylist,
+  runSingerSearch,
+  addSong,
+  promoteSong,
+  removeSong,
+  runGlobalCommand,
+  isSongQueued,
+  isSongPending,
+} = useKodApi({
+  activeBaseUrl,
+  searchForm,
+  searchState,
+  pageInput,
+  playlistState,
+  singerForm,
+  singerState,
+  singerPageInput,
+  setLastRequest,
+  setLastResponse,
+  setLastError,
+  logDiagnosticEvent,
+  searchSongs,
+  fetchPlaylist,
+  fetchSingers,
+  queueSong,
+  prioritizeSong,
+  deleteSong,
+})
 
 function submitSingerSearch() {
   singerState.page = 0
@@ -446,89 +311,6 @@ function goToSingerPage() {
   runSingerSearch()
 }
 
-async function addSong(songId) {
-  if (!songId || !hasConfiguredBaseUrl()) {
-    return
-  }
-
-  try {
-    setLastRequest('CommandServlet', `cmd=Add1 cmdValue=${songId}`)
-    await queueSong(activeBaseUrl.value, songId)
-    setLastResponse(`Command Add1 succeeded for ${songId}`)
-    setLastError('')
-    logDiagnosticEvent(`Queued song ${songId}`)
-    await refreshPlaylist(true)
-  } catch (error) {
-    setLastError(error instanceof Error ? error.message : String(error))
-    setLastResponse('Command Add1 failed')
-    logDiagnosticEvent(`Queue failed for ${songId}: ${diagnosticsState.lastError}`)
-    console.error(error)
-  }
-}
-
-async function promoteSong(songId) {
-  if (!songId || !hasConfiguredBaseUrl()) {
-    return
-  }
-
-  try {
-    setLastRequest('CommandServlet', `cmd=Pro1 cmdValue=${songId}`)
-    await prioritizeSong(activeBaseUrl.value, songId)
-    setLastResponse(`Command Pro1 succeeded for ${songId}`)
-    setLastError('')
-    logDiagnosticEvent(`Prioritized song ${songId}`)
-    await refreshPlaylist(true)
-  } catch (error) {
-    setLastError(error instanceof Error ? error.message : String(error))
-    setLastResponse('Command Pro1 failed')
-    logDiagnosticEvent(`Prioritize failed for ${songId}: ${diagnosticsState.lastError}`)
-    console.error(error)
-  }
-}
-
-async function removeSong(songId) {
-  if (!songId || !hasConfiguredBaseUrl()) {
-    return
-  }
-
-  try {
-    setLastRequest('CommandServlet', `cmd=Del1 cmdValue=${songId}`)
-    await deleteSong(activeBaseUrl.value, songId)
-    setLastResponse(`Command Del1 succeeded for ${songId}`)
-    setLastError('')
-    logDiagnosticEvent(`Deleted song ${songId}`)
-    await refreshPlaylist(true)
-  } catch (error) {
-    setLastError(error instanceof Error ? error.message : String(error))
-    setLastResponse('Command Del1 failed')
-    logDiagnosticEvent(`Delete failed for ${songId}: ${diagnosticsState.lastError}`)
-    console.error(error)
-  }
-}
-
-async function runGlobalCommand(commandRunner) {
-  if (commandBarBusy.value || !hasConfiguredBaseUrl()) {
-    return
-  }
-
-  commandBarBusy.value = true
-
-  try {
-    setLastRequest('CommandServlet', `cmd=${commandRunner.name || 'unknown'}`)
-    await commandRunner(activeBaseUrl.value)
-    setLastResponse(`Command ${commandRunner.name || 'unknown'} succeeded`)
-    setLastError('')
-    logDiagnosticEvent(`Command ${commandRunner.name || 'unknown'} succeeded`)
-    await refreshPlaylist(true)
-  } catch (error) {
-    setLastError(error instanceof Error ? error.message : String(error))
-    setLastResponse(`Command ${commandRunner.name || 'unknown'} failed`)
-    logDiagnosticEvent(`Command ${commandRunner.name || 'unknown'} failed: ${diagnosticsState.lastError}`)
-    console.error(error)
-  } finally {
-    commandBarBusy.value = false
-  }
-}
 
 function submitSearch() {
   searchState.page = 0
@@ -567,16 +349,24 @@ function goToPage() {
   runSearch()
 }
 
+const baseUrlError = ref('')
+
 async function saveResolvedBaseUrl(nextBaseUrl = baseUrlInput.value) {
   const trimmedBaseUrl = nextBaseUrl.trim()
   const resolvedBaseUrl = resolveBaseUrl(nextBaseUrl)
 
+  if (trimmedBaseUrl && !resolvedBaseUrl) {
+    baseUrlError.value = 'Enter a valid server URL, for example: http://device-ip:8080'
+    return
+  }
+
+  baseUrlError.value = ''
   baseUrlInput.value = resolvedBaseUrl
 
   if (!resolvedBaseUrl) {
     activeBaseUrl.value = ''
     syncBaseUrlQuery('')
-    logDiagnosticEvent(trimmedBaseUrl ? `Base URL saved: ${resolvedBaseUrl}` : 'Base URL cleared')
+    logDiagnosticEvent('Base URL cleared')
     reloadIntoPrimaryTab()
     return
   }
@@ -633,6 +423,15 @@ function saveMicControlPreference() {
   window.localStorage.setItem(MIC_CONTROL_STORAGE_KEY, micControlledByKod.value ? 'true' : 'false')
 }
 
+const {
+  isFavoriteSong,
+  syncFavoriteSongIds,
+  toggleFavoriteSong: addFavoriteSong,
+} = useFavorites({
+  storageKey: FAVORITES_STORAGE_KEY,
+  logEvent: logDiagnosticEvent,
+})
+
 watch(isDarkMode, () => {
   applyTheme()
 })
@@ -642,6 +441,7 @@ watch(micControlledByKod, () => {
 })
 
 onMounted(() => {
+  syncFavoriteSongIds()
   applyTheme()
   themeMediaQuery = window.matchMedia?.('(prefers-color-scheme: dark)') ?? null
 
@@ -676,7 +476,7 @@ onBeforeUnmount(() => {
     themeMediaQuery.removeEventListener('change', syncThemePreference)
   }
 
-  clearReportStatus()
+  disposeDiagnostics()
 
   window.removeEventListener('resize', updateCommandBarOffset)
 })
@@ -767,6 +567,7 @@ onBeforeUnmount(() => {
         >
           <SettingsPanel
             :base-url-input="baseUrlInput"
+            :base-url-error="baseUrlError"
             :is-dark-mode="isDarkMode"
             :mic-controlled-by-kod="micControlledByKod"
             :report-status="diagnosticsState.reportStatus"
@@ -792,11 +593,15 @@ onBeforeUnmount(() => {
           :display-page="displayPage"
           :page-input="pageInput"
           :singer-image-url="singerImageUrl"
+          :is-favorite-song="isFavoriteSong"
+          :is-song-queued="isSongQueued"
+          :is-song-pending="isSongPending"
           @go-to-setup="goToSetup"
           @submit-search="submitSearch"
           @reset-search="resetSearch"
           @promote-song="promoteSong"
           @add-song="addSong"
+          @favorite-song="addFavoriteSong"
           @update:page-input="pageInput = $event"
           @go-to-previous-page="goToPreviousPage"
           @go-to-next-page="goToNextPage"
@@ -827,73 +632,33 @@ onBeforeUnmount(() => {
         :active-mobile-tab="activeMobileTab"
         :playlist-state="playlistState"
         :poll-interval-ms="POLL_INTERVAL_MS"
+        :is-favorite-song="isFavoriteSong"
+        :is-song-pending="isSongPending"
         @promote-song="promoteSong"
         @remove-song="removeSong"
+        @favorite-song="addFavoriteSong"
       />
     </div>
   </main>
 
   <div ref="commandBarRef" class="command-bar">
-    <div class="command-bar-inner">
-      <div v-show="showMixerControls" class="command-bar-row command-bar-row-primary">
-        <div class="command-group">
-          <span class="command-group-label">Pitch</span>
-          <div class="command-group-buttons">
-            <button data-test="command-tone-down" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(toneDown)">
-              ♭
-            </button>
-            <button data-test="command-tone-reset" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(toneReset)">
-              ♮
-            </button>
-            <button data-test="command-tone-up" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(toneUp)">
-              ♯
-            </button>
-          </div>
-        </div>
-        <div class="command-group">
-          <span class="command-group-label">Volume</span>
-          <div class="command-group-buttons">
-            <button data-test="command-mute" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(toggleMute)">
-              🔇
-            </button>
-            <button data-test="command-music-down" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(musicDown)">
-              🔉
-            </button>
-            <button data-test="command-music-up" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(musicUp)">
-              🔊
-            </button>
-            <button data-test="command-mic-down" type="button" :disabled="commandBarBusy || !micControlledByKod" @click="runGlobalCommand(micDown)">
-              🎤-
-            </button>
-            <button data-test="command-mic-up" type="button" :disabled="commandBarBusy || !micControlledByKod" @click="runGlobalCommand(micUp)">
-              🎤+
-            </button>
-          </div>
-        </div>
-      </div>
-      <div class="command-bar-row command-bar-row-secondary">
-        <button data-test="command-reset" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(restartDevice)">
-          Replay
-        </button>
-        <button data-test="command-vocals" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(toggleVocals)">
-          Vocals
-        </button>
-        <button data-test="command-play" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(togglePlay)">
-          ⏯
-        </button>
-        <button data-test="command-skip" type="button" :disabled="commandBarBusy" @click="runGlobalCommand(skipSong)">
-          ⏭
-        </button>
-        <button
-          data-test="command-toggle-mixer"
-          type="button"
-          :aria-expanded="showMixerControls"
-          :title="showMixerControls ? 'Hide pitch and volume controls' : 'Show pitch and volume controls'"
-          @click="showMixerControls = !showMixerControls"
-        >
-          ☰
-        </button>
-      </div>
-    </div>
+    <CommandBar
+      :command-bar-busy="commandBarBusy"
+      :mic-controlled-by-kod="micControlledByKod"
+      :show-mixer-controls="showMixerControls"
+      @toggle-mixer="showMixerControls = !showMixerControls"
+      @reset="runGlobalCommand(restartDevice)"
+      @vocals="runGlobalCommand(toggleVocals)"
+      @play="runGlobalCommand(togglePlay)"
+      @skip="runGlobalCommand(skipSong)"
+      @tone-down="runGlobalCommand(toneDown)"
+      @tone-reset="runGlobalCommand(toneReset)"
+      @tone-up="runGlobalCommand(toneUp)"
+      @mute="runGlobalCommand(toggleMute)"
+      @music-down="runGlobalCommand(musicDown)"
+      @music-up="runGlobalCommand(musicUp)"
+      @mic-down="runGlobalCommand(micDown)"
+      @mic-up="runGlobalCommand(micUp)"
+    />
   </div>
 </template>

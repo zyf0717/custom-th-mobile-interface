@@ -40,6 +40,18 @@ defineProps({
     type: Function,
     required: true,
   },
+  isFavoriteSong: {
+    type: Function,
+    required: true,
+  },
+  isSongQueued: {
+    type: Function,
+    required: true,
+  },
+  isSongPending: {
+    type: Function,
+    required: true,
+  },
 })
 
 const emit = defineEmits([
@@ -48,6 +60,7 @@ const emit = defineEmits([
   'reset-search',
   'promote-song',
   'add-song',
+  'favorite-song',
   'update:page-input',
   'go-to-previous-page',
   'go-to-next-page',
@@ -148,23 +161,36 @@ function updatePageInput(event) {
                   </div>
                 </div>
               </td>
-              <td class="action-cell">
-                <button
-                  :data-test="`promote-song-${song.id}`"
-                  type="button"
-                  class="button-secondary button-command button-emoji"
-                  @click="emit('promote-song', song.id)"
-                >
-                  ⏫
-                </button>
-                <button
-                  :data-test="`add-song-${song.id}`"
-                  type="button"
-                  class="button-secondary button-command"
-                  @click="emit('add-song', song.id)"
-                >
-                  ➕<span v-if="song.cloud" class="button-cloud"> ({{ cloudMarker }})</span>
-                </button>
+              <td class="top-hit-action-cell">
+                <div class="action-cell">
+                  <button
+                    :data-test="`favorite-song-${song.id}`"
+                    type="button"
+                    class="button-secondary button-command button-emoji"
+                    :aria-label="isFavoriteSong(song.id) ? `Remove ${song.name} from favorites` : `Add ${song.name} to favorites`"
+                    @click="emit('favorite-song', song)"
+                  >
+                    {{ isFavoriteSong(song.id) ? '⭐️' : 'Fav' }}
+                  </button>
+                  <button
+                    :data-test="`promote-song-${song.id}`"
+                    type="button"
+                    class="button-secondary button-command button-emoji"
+                    :disabled="isSongPending(song.id)"
+                    @click="emit('promote-song', song.id)"
+                  >
+                    ⏫
+                  </button>
+                  <button
+                    :data-test="`add-song-${song.id}`"
+                    type="button"
+                    class="button-secondary button-command"
+                    :disabled="isSongPending(song.id)"
+                    @click="emit('add-song', song.id)"
+                  >
+                    {{ isSongQueued(song.id) ? 'Del' : 'Add' }}<span v-if="song.cloud && !isSongQueued(song.id)" class="button-cloud"> ({{ cloudMarker }})</span>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>

@@ -9,7 +9,7 @@ export function resolveBaseUrl(value) {
     return ''
   }
 
-  return extractBaseUrlCandidate(trimmedValue) || trimmedValue
+  return extractBaseUrlCandidate(trimmedValue) || ''
 }
 
 export function extractBaseUrlFromQrPayload(rawValue) {

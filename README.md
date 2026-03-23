@@ -3,6 +3,7 @@
 Open KOD is an alternative web UI for karaoke devices that expose the stock KOD HTTP/JSONP endpoints.
 
 This app focuses on a cleaner browser interface for:
+
 - searching songs
 - queueing and prioritizing songs
 - viewing the current playlist
@@ -15,6 +16,21 @@ The UI talks directly to the karaoke device over the local network. It does not 
 - Vue 3
 - Vite
 - Vitest
+
+## Project Structure
+
+```text
+src/
+  components/      # Vue UI panels and presentational components
+  composables/     # Reusable stateful logic (favorites, queue behavior, etc.)
+  constants/       # App constants and option catalogs
+  services/        # API/service layer wrappers
+  lib/             # Backward-compatible legacy utilities
+  test/            # Tests by type and shared test setup
+    integration/   # App integration suites (browse, controls/setup)
+    unit/          # Unit tests (services, utilities, composables)
+    setup/         # Vitest global setup
+```
 
 ## Development
 
@@ -31,7 +47,32 @@ Other useful commands:
 npm run test
 npm run build
 npm run preview
+npm run mock:kod
 ```
+
+Recommended Node version: 22.x (matches CI workflows).
+
+## Manual UI Testing
+
+For manual browser testing without a real karaoke device, run the local mock KOD server:
+
+```bash
+npm run mock:kod
+```
+
+Then start the app separately:
+
+```bash
+npm run dev
+```
+
+Open the app with this base URL:
+
+```text
+http://127.0.0.1:8080
+```
+
+The mock server lives in [`tools/mock-kod-server.mjs`](tools/mock-kod-server.mjs). It implements the JSONP endpoints used by the app, keeps an in-memory playlist, handles command actions, and serves placeholder singer artwork so you can test the actual UI and UX flow in a browser.
 
 ## Device Setup
 

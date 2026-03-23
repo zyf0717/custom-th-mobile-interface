@@ -20,7 +20,7 @@ import {
   togglePlay,
   toggleMute,
   toggleVocals,
-} from './kodApi'
+} from '../../../lib/kodApi'
 
 const TEST_BASE_URL = 'http://10.0.0.20:8080'
 

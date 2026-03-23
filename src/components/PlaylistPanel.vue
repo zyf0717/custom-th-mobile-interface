@@ -12,9 +12,17 @@ defineProps({
     type: Number,
     required: true,
   },
+  isFavoriteSong: {
+    type: Function,
+    required: true,
+  },
+  isSongPending: {
+    type: Function,
+    required: true,
+  },
 })
 
-const emit = defineEmits(['promote-song', 'remove-song'])
+const emit = defineEmits(['promote-song', 'remove-song', 'favorite-song'])
 </script>
 
 <template>
@@ -39,9 +47,19 @@ const emit = defineEmits(['promote-song', 'remove-song'])
           </div>
           <div class="action-cell">
             <button
+              :data-test="`playlist-favorite-song-${song.id}`"
+              type="button"
+              class="button-secondary button-command button-emoji"
+              :aria-label="isFavoriteSong(song.id) ? `Remove ${song.name} from favorites` : `Add ${song.name} to favorites`"
+              @click="emit('favorite-song', song)"
+            >
+              {{ isFavoriteSong(song.id) ? '⭐️' : 'Fav' }}
+            </button>
+            <button
               :data-test="`playlist-promote-song-${song.id}`"
               type="button"
               class="button-secondary button-command button-emoji"
+              :disabled="isSongPending(song.id)"
               @click="emit('promote-song', song.id)"
             >
               ⏫
@@ -49,10 +67,11 @@ const emit = defineEmits(['promote-song', 'remove-song'])
             <button
               :data-test="`delete-song-${song.id}`"
               type="button"
-              class="button-secondary button-danger button-emoji"
+              class="button-secondary button-command"
+              :disabled="isSongPending(song.id)"
               @click="emit('remove-song', song.id)"
             >
-              ⛔
+              Del
             </button>
           </div>
         </div>

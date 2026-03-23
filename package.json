@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "mock:kod": "node tools/mock-kod-server.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "engines": {
+    "node": "22.x"
   },
   "dependencies": {
     "jsqr": "^1.4.0",

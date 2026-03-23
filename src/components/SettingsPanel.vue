@@ -24,6 +24,10 @@ defineProps({
     type: String,
     required: true,
   },
+  baseUrlError: {
+    type: String,
+    default: '',
+  },
   isDarkMode: {
     type: Boolean,
     required: true,
@@ -288,6 +292,7 @@ onBeforeUnmount(() => {
             <button data-test="save-base-url" type="button" class="button-emoji" @click="$emit('save-base-url')">➤</button>
           </div>
         </label>
+        <p v-if="baseUrlError" data-test="base-url-error" class="field-help base-url-error">{{ baseUrlError }}</p>
 
         <div class="theme-control">
           <span class="field-help">Toggle to override auto-theme:</span>
@@ -330,7 +335,7 @@ onBeforeUnmount(() => {
         </div>
         <p class="field-help">
           After downloading the issue report, attach the <code>.txt</code> file to a new email and send it to
-          <a :href="supportEmailHref(supportEmail)"><code>{{ supportEmail }}</code></a>.
+          <a :href="supportEmailHref(supportEmail)" class="support-email-link"><code>{{ supportEmail }}</code></a>.
         </p>
         <p v-if="reportStatus" class="field-help settings-status">{{ reportStatus }}</p>
       </section>

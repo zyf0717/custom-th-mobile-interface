@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { extractBaseUrlFromQrPayload, resolveBaseUrl } from './baseUrl'
+import { extractBaseUrlFromQrPayload, resolveBaseUrl } from '../../../lib/baseUrl'
 
 describe('baseUrl helpers', () => {
   it('resolves an empty base URL to an empty string', () => {
@@ -23,6 +23,11 @@ describe('baseUrl helpers', () => {
 
   it('extracts an embedded device URL from surrounding text', () => {
     expect(extractBaseUrlFromQrPayload('Connect here: https://karaoke.local:8443/app now')).toBe('https://karaoke.local:8443')
+  })
+
+  it('returns empty string for an unrecognisable input', () => {
+    expect(resolveBaseUrl('http//invalid')).toBe('')
+    expect(resolveBaseUrl('not-a-url')).toBe('')
   })
 
   it('returns null when the QR payload does not contain a usable URL', () => {
