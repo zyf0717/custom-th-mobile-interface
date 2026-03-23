@@ -237,7 +237,7 @@ onBeforeUnmount(() => {
   <header class="hero settings-hero">
     <section class="hero-copy settings-block settings-block-intro">
       <div class="settings-block-header">
-        <h1>custom-th-mobile-interface</h1>
+        <h1>Custom KTV Mobile Interface</h1>
       </div>
       <p class="subtitle">
         A custom interface for the same endpoints used by the Teo Heng WASUKA KOD-9000 web app.
