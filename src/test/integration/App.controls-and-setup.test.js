@@ -212,7 +212,7 @@ describe('App', () => {
   })
 
   it('sends mic up from the command bar and refreshes the playlist', async () => {
-    window.localStorage.setItem('open-kod-mic-controlled', 'true')
+    window.localStorage.setItem('custom-th-mobile-interface-mic-controlled', 'true')
 
     const wrapper = mount(App)
 
@@ -227,7 +227,7 @@ describe('App', () => {
   })
 
   it('sends mic down from the command bar and refreshes the playlist', async () => {
-    window.localStorage.setItem('open-kod-mic-controlled', 'true')
+    window.localStorage.setItem('custom-th-mobile-interface-mic-controlled', 'true')
 
     const wrapper = mount(App)
 
@@ -273,7 +273,7 @@ describe('App', () => {
 
     expect(createObjectUrl).toHaveBeenCalledTimes(1)
     expect(anchorClick).toHaveBeenCalledTimes(1)
-    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:open-kod-report')
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:custom-th-mobile-interface-report')
     expect(wrapper.text()).toContain('Issue report downloaded. Attach it to your email.')
 
     wrapper.unmount()

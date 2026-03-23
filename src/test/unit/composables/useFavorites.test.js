@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { useFavorites } from '../../../composables/useFavorites'
 
-const STORAGE_KEY = 'open-kod-favorites-test'
+const STORAGE_KEY = 'custom-th-mobile-interface-favorites-test'
 
 function ensureLocalStorageApi() {
   if (window.localStorage && typeof window.localStorage.setItem === 'function') {

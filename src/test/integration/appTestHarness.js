@@ -1,5 +1,5 @@
 export const TEST_BASE_URL = 'http://10.0.0.20:8080'
-export const FAVORITES_STORAGE_KEY = 'open-kod-favorites'
+export const FAVORITES_STORAGE_KEY = 'custom-th-mobile-interface-favorites'
 
 export function buildSearchResponse() {
   return {
@@ -230,5 +230,5 @@ export function setupDefaultAppTestState(mocks, baseUrl = TEST_BASE_URL) {
   toneDown.mockResolvedValue({ cmd: 'Tone_down', code: '0' })
   toneUp.mockResolvedValue({ cmd: 'Tone_up', code: '0' })
   decodeQrCode.mockReturnValue(null)
-  createObjectUrl.mockReturnValue('blob:open-kod-report')
+  createObjectUrl.mockReturnValue('blob:custom-th-mobile-interface-report')
 }

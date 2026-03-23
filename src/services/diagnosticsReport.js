@@ -33,7 +33,7 @@ export function buildDiagnosticsReport({
   events,
 }) {
   const lines = [
-    'Open KOD issue report',
+    'custom-th-mobile-interface issue report',
     `Version: ${version}`,
     `Generated: ${generatedAt}`,
     `Base URL: ${baseUrl}`,
@@ -59,5 +59,5 @@ export function buildDiagnosticsReport({
 
 export function buildReportFilename(now = new Date()) {
   const stamp = now.toISOString().replace(/[:.]/g, '-')
-  return `open-kod-issue-report-${stamp}.txt`
+  return `custom-th-mobile-interface-issue-report-${stamp}.txt`
 }

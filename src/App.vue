@@ -23,6 +23,8 @@ import {
   DIAGNOSTIC_EVENT_LIMIT,
   FAVORITES_STORAGE_KEY,
   LANGUAGE_OPTIONS,
+  LEGACY_FAVORITES_STORAGE_KEY,
+  LEGACY_MIC_CONTROL_STORAGE_KEY,
   MIC_CONTROL_STORAGE_KEY,
   POLL_INTERVAL_MS,
   SINGER_COUNTRY_OPTIONS,
@@ -49,6 +51,8 @@ import {
   toggleMute,
   toggleVocals,
 } from './services/kodApi'
+
+clearLegacyLocalStorage()
 
 const initialBaseUrl = getBaseUrlFromQuery()
 const initialPrimaryTab = initialBaseUrl ? 'topHits' : 'settings'
@@ -115,6 +119,11 @@ let themeMediaQuery = null
 
 const displayPage = computed(() => searchState.page + 1)
 const singerDisplayPage = computed(() => singerState.page + 1)
+
+function clearLegacyLocalStorage() {
+  window.localStorage.removeItem(LEGACY_MIC_CONTROL_STORAGE_KEY)
+  window.localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY)
+}
 
 function clearSearchForm() {
   searchForm.songName = ''

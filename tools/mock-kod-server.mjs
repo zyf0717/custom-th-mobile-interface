@@ -318,7 +318,7 @@ const server = createServer((request, response) => {
     sendText(
       response,
       [
-        'Open KOD mock server',
+        'custom-th-mobile-interface mock server',
         '',
         `SearchServlet: http://127.0.0.1:${PORT}/SearchServlet`,
         `SingerServlet: http://127.0.0.1:${PORT}/SingerServlet`,
@@ -331,7 +331,7 @@ const server = createServer((request, response) => {
 
   if (url.pathname.startsWith('/singer/')) {
     const fileName = decodeURIComponent(url.pathname.slice('/singer/'.length))
-    const title = SONGS.find((item) => item.singerPic === fileName)?.singer || 'Open KOD'
+    const title = SONGS.find((item) => item.singerPic === fileName)?.singer || 'custom-th-mobile-interface'
     sendSvg(response, title)
     return
   }
@@ -366,6 +366,6 @@ const server = createServer((request, response) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`Open KOD mock server listening on http://${HOST}:${PORT}`)
+  console.log(`custom-th-mobile-interface mock server listening on http://${HOST}:${PORT}`)
   console.log(`Use base URL: http://127.0.0.1:${PORT}`)
 })

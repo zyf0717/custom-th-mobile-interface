@@ -31,6 +31,6 @@ describe('baseUrl helpers', () => {
   })
 
   it('returns null when the QR payload does not contain a usable URL', () => {
-    expect(extractBaseUrlFromQrPayload('Open KOD setup code only')).toBeNull()
+    expect(extractBaseUrlFromQrPayload('custom-th-mobile-interface setup code only')).toBeNull()
   })
 })

@@ -1,6 +1,6 @@
-# Open KOD
+# custom-th-mobile-interface
 
-Open KOD is an alternative web UI for karaoke devices that expose the stock KOD HTTP/JSONP endpoints.
+custom-th-mobile-interface is an alternative web UI for karaoke devices that expose the stock KOD HTTP/JSONP endpoints.
 
 This app focuses on a cleaner browser interface for:
 
@@ -96,7 +96,7 @@ If the QR scanner is unavailable on your browser or OS, enter the server URL man
 
 ## How It Works
 
-Open KOD uses the same browser-facing endpoints as the stock device UI:
+custom-th-mobile-interface uses the same browser-facing endpoints as the stock device UI:
 
 - `SearchServlet` for song search
 - `PlaylistServlet` for queue and playback state

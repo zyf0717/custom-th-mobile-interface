@@ -3,12 +3,12 @@ import jsQR from 'jsqr'
 import { nextTick, onBeforeUnmount, ref } from 'vue'
 import { extractBaseUrlFromQrPayload } from '../lib/baseUrl'
 
-const SUPPORT_EMAIL_SUBJECT = encodeURIComponent('Open KOD issue report')
+const SUPPORT_EMAIL_SUBJECT = encodeURIComponent('custom-th-mobile-interface issue report')
 const SUPPORT_EMAIL_BODY = encodeURIComponent(
   [
     'Hi,',
     '',
-    'I am reporting an issue with Open KOD.',
+    'I am reporting an issue with custom-th-mobile-interface.',
     '',
     'Please find the downloaded issue report attached.',
     '',
@@ -237,7 +237,7 @@ onBeforeUnmount(() => {
   <header class="hero settings-hero">
     <section class="hero-copy settings-block settings-block-intro">
       <div class="settings-block-header">
-        <h1>Open KOD</h1>
+        <h1>custom-th-mobile-interface</h1>
       </div>
       <p class="subtitle">
         An alternative interface for the same device endpoints used by the default KOD app.
