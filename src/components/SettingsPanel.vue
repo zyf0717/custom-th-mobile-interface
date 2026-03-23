@@ -240,10 +240,10 @@ onBeforeUnmount(() => {
         <h1>custom-th-mobile-interface</h1>
       </div>
       <p class="subtitle">
-        An alternative interface for the same device endpoints used by the default KOD app.
+        A custom interface for the same endpoints used by the Teo Heng WASUKA KOD-9000 web app.
       </p>
       <p class="field-help">
-        <strong>NOTE:</strong> Use <code>http://</code> for both this app. This currently works on both Android and iOS browsers.
+        <strong>NOTE:</strong> Browser behavior differs: Safari and most iOS browsers may work with <code>http://</code>, while Chrome (including Android Chrome) typically requires opening this app over <code>https://</code> and allowing local network access.
       </p>
     </section>
 
