@@ -3,7 +3,6 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  base: process.env.GITHUB_PAGES === 'true'
-    ? process.env.GITHUB_PAGES_BASE_PATH || '/'
-    : './',
+  // Use relative asset paths so deployments work on both custom domains and repo subpaths.
+  base: './',
 })
