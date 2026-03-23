@@ -31,7 +31,7 @@ describe('diagnosticsReport service', () => {
       events: ['2026-03-23T10:00:00.000Z Session started'],
     })
 
-    expect(report).toContain('custom-th-mobile-interface issue report')
+    expect(report).toContain('teoheng-web-app issue report')
     expect(report).toContain('Version: 0.1.0')
     expect(report).toContain('Top Hits page: 1/5')
     expect(report).toContain('Singer page: 2/10')
@@ -40,11 +40,11 @@ describe('diagnosticsReport service', () => {
 
   it('builds deterministic report filename from provided date', () => {
     const fileName = buildReportFilename(new Date('2026-03-23T10:00:00.123Z'))
-    expect(fileName).toBe('custom-th-mobile-interface-issue-report-2026-03-23T10-00-00-123Z.txt')
+    expect(fileName).toBe('teoheng-web-app-issue-report-2026-03-23T10-00-00-123Z.txt')
   })
 
   it('downloads text with blob URL lifecycle', () => {
-    const createObjectURL = vi.fn().mockReturnValue('blob:custom-th-mobile-interface')
+    const createObjectURL = vi.fn().mockReturnValue('blob:teoheng-web-app')
     const revokeObjectURL = vi.fn()
     const click = vi.fn()
 
@@ -56,6 +56,6 @@ describe('diagnosticsReport service', () => {
 
     expect(createObjectURL).toHaveBeenCalledTimes(1)
     expect(click).toHaveBeenCalledTimes(1)
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:custom-th-mobile-interface')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:teoheng-web-app')
   })
 })

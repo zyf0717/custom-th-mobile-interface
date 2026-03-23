@@ -3,12 +3,12 @@ import jsQR from 'jsqr'
 import { nextTick, onBeforeUnmount, ref } from 'vue'
 import { extractBaseUrlFromQrPayload } from '../lib/baseUrl'
 
-const SUPPORT_EMAIL_SUBJECT = encodeURIComponent('custom-th-mobile-interface issue report')
+const SUPPORT_EMAIL_SUBJECT = encodeURIComponent('teoheng-web-app issue report')
 const SUPPORT_EMAIL_BODY = encodeURIComponent(
   [
     'Hi,',
     '',
-    'I am reporting an issue with custom-th-mobile-interface.',
+    'I am reporting an issue with teoheng-web-app.',
     '',
     'Please find the downloaded issue report attached.',
     '',

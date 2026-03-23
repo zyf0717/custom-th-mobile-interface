@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { useFavorites } from '../../../composables/useFavorites'
 
-const STORAGE_KEY = 'custom-th-mobile-interface-favorites-test'
+const STORAGE_KEY = 'teoheng-web-app-favorites-test'
 
 function ensureLocalStorageApi() {
   if (window.localStorage && typeof window.localStorage.setItem === 'function') {
@@ -90,5 +90,74 @@ describe('useFavorites', () => {
     const secondSaved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]')
     expect(secondSaved).toHaveLength(0)
     expect(logEvent).toHaveBeenLastCalledWith('Removed favorite song 2001')
+  })
+
+  it('imports favorites by appending new songs and skipping duplicates', () => {
+    ensureLocalStorageApi()
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        { id: '1001', name: 'Song A', singer: 'Singer A', savedAt: '2026-03-23T09:00:00.000Z' },
+      ]),
+    )
+    const logEvent = vi.fn()
+    const favorites = useFavorites({ storageKey: STORAGE_KEY, logEvent })
+
+    const result = favorites.importFavoriteSongs([
+      { id: '1001', name: 'Song A updated' },
+      { id: '1002', name: 'Song B', singer: 'Singer B', cloud: 1 },
+      { name: 'Missing id' },
+    ])
+
+    const savedFavorites = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '[]')
+
+    expect(result).toEqual({
+      addedCount: 1,
+      duplicateCount: 1,
+      invalidCount: 1,
+      totalCount: 2,
+    })
+    expect(savedFavorites).toHaveLength(2)
+    expect(savedFavorites[0]).toEqual(
+      expect.objectContaining({
+        id: '1001',
+        name: 'Song A',
+      }),
+    )
+    expect(savedFavorites[1]).toEqual(
+      expect.objectContaining({
+        id: '1002',
+        name: 'Song B',
+        singer: 'Singer B',
+        cloud: true,
+      }),
+    )
+    expect(logEvent).toHaveBeenLastCalledWith('Imported favorites: 1 added, 1 duplicates skipped, 1 invalid skipped')
+  })
+
+  it('exports normalized favorites as formatted JSON', () => {
+    ensureLocalStorageApi()
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([
+        { id: '1001', name: 'Song A', singer: 'Singer A', cloud: 0 },
+        { id: '1001', name: 'Duplicate Song A' },
+      ]),
+    )
+
+    const favorites = useFavorites({ storageKey: STORAGE_KEY })
+    favorites.syncFavoriteSongIds()
+
+    const exportedFavorites = JSON.parse(favorites.exportFavoriteSongs())
+
+    expect(exportedFavorites).toHaveLength(1)
+    expect(exportedFavorites[0]).toEqual(
+      expect.objectContaining({
+        id: '1001',
+        name: 'Song A',
+        singer: 'Singer A',
+        cloud: false,
+      }),
+    )
   })
 })

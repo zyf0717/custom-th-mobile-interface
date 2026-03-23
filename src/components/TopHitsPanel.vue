@@ -166,14 +166,13 @@ function updatePageInput(event) {
           >
             ◀
           </button>
-          <span>Page {{ displayPage }}<template v-if="searchState.maxPage">/{{ searchState.maxPage }}</template></span>
+          <span>{{ displayPage }}<template v-if="searchState.maxPage">/{{ searchState.maxPage }}</template></span>
           <button type="button" class="page-arrow page-arrow-next" :disabled="searchState.loading" @click="emit('go-to-next-page')">
             ▶
           </button>
         </div>
         <div class="page-jump-row">
           <label class="page-jump">
-            <span>Page:</span>
             <input :value="pageInput" type="text" inputmode="numeric" pattern="[0-9]*" @input="updatePageInput" />
           </label>
           <button type="button" :disabled="searchState.loading" @click="emit('go-to-page')">
@@ -258,14 +257,13 @@ function updatePageInput(event) {
           >
             ◀
           </button>
-          <span>Page {{ displayPage }}<template v-if="searchState.maxPage">/{{ searchState.maxPage }}</template></span>
+          <span>{{ displayPage }}<template v-if="searchState.maxPage">/{{ searchState.maxPage }}</template></span>
           <button type="button" class="page-arrow page-arrow-next" :disabled="searchState.loading" @click="emit('go-to-next-page')">
             ▶
           </button>
         </div>
         <div class="page-jump-row">
           <label class="page-jump">
-            <span>Page:</span>
             <input :value="pageInput" type="text" inputmode="numeric" pattern="[0-9]*" @input="updatePageInput" />
           </label>
           <button type="button" :disabled="searchState.loading" @click="emit('go-to-page')">

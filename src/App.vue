@@ -21,9 +21,8 @@ import {
   BASE_URL_QUERY_PARAM,
   DIAGNOSTIC_EVENT_LIMIT,
   FAVORITES_STORAGE_KEY,
+  FAVORITES_PAGE_SIZE,
   LANGUAGE_OPTIONS,
-  LEGACY_FAVORITES_STORAGE_KEY,
-  LEGACY_MIC_CONTROL_STORAGE_KEY,
   MIC_CONTROL_STORAGE_KEY,
   POLL_INTERVAL_MS,
   SINGER_COUNTRY_OPTIONS,
@@ -51,14 +50,13 @@ import {
   toggleVocals,
 } from './services/kodApi'
 
-clearLegacyLocalStorage()
-
 const initialBaseUrl = getBaseUrlFromQuery()
 const initialPrimaryTab = initialBaseUrl ? 'topHits' : 'settings'
 const activeBaseUrl = ref(initialBaseUrl)
 const baseUrlInput = ref(initialBaseUrl)
 const pageInput = ref(1)
 const singerPageInput = ref(1)
+const favoritesPageInput = ref(1)
 const activeMobileTab = ref(initialPrimaryTab)
 const activeBrowseTab = ref(initialPrimaryTab)
 const commandBarRef = ref(null)
@@ -67,6 +65,8 @@ const themeOverride = ref(null)
 const isDarkMode = computed(() => themeOverride.value ?? systemPrefersDarkMode.value)
 const micControlledByKod = ref(window.localStorage.getItem(MIC_CONTROL_STORAGE_KEY) === 'true')
 const showMixerControls = ref(false)
+const favoritesPage = ref(0)
+const favoritesTransferStatus = ref('')
 
 const searchForm = reactive({
   songName: '',
@@ -119,24 +119,16 @@ let themeMediaQuery = null
 const displayPage = computed(() => searchState.page + 1)
 const singerDisplayPage = computed(() => singerState.page + 1)
 
-function clearLegacyLocalStorage() {
-  window.localStorage.removeItem(LEGACY_MIC_CONTROL_STORAGE_KEY)
-  window.localStorage.removeItem(LEGACY_FAVORITES_STORAGE_KEY)
-}
-
 function clearSearchForm() {
   searchForm.songName = ''
   searchForm.singer = ''
   searchForm.lang = LANGUAGE_OPTIONS[0].value
   searchForm.songType = ''
   searchForm.sortType = ''
-  searchState.page = 0
-  pageInput.value = 1
 }
 
 function resetSearch() {
   clearSearchForm()
-  runSearch()
 }
 
 function hasConfiguredBaseUrl() {
@@ -260,15 +252,14 @@ function submitSingerSearch() {
 function resetSingerSearch() {
   singerForm.singer = ''
   singerForm.singerType = SINGER_COUNTRY_OPTIONS[0].value
-  singerState.page = 0
-  singerPageInput.value = 1
-  runSingerSearch()
 }
 
 function searchTopHitsBySinger(singerName) {
   clearSearchForm()
   searchForm.singer = singerName.trim()
   setBrowseTab('topHits')
+  searchState.page = 0
+  pageInput.value = 1
   runSearch()
 }
 
@@ -354,6 +345,31 @@ function goToPage() {
   runSearch()
 }
 
+function goToPreviousFavoritesPage() {
+  if (favoritesPage.value === 0) {
+    return
+  }
+
+  favoritesPage.value -= 1
+  favoritesPageInput.value = favoritesPage.value + 1
+}
+
+function goToNextFavoritesPage() {
+  if (favoritesPage.value >= favoriteTotalPages.value - 1) {
+    return
+  }
+
+  favoritesPage.value += 1
+  favoritesPageInput.value = favoritesPage.value + 1
+}
+
+function goToFavoritesPage() {
+  const nextPage = Math.min(Math.max(1, Number(favoritesPageInput.value) || 1), favoriteTotalPages.value)
+
+  favoritesPage.value = nextPage - 1
+  favoritesPageInput.value = nextPage
+}
+
 const baseUrlError = ref('')
 
 async function saveResolvedBaseUrl(nextBaseUrl = baseUrlInput.value) {
@@ -428,14 +444,74 @@ function saveMicControlPreference() {
   window.localStorage.setItem(MIC_CONTROL_STORAGE_KEY, micControlledByKod.value ? 'true' : 'false')
 }
 
+function buildFavoritesFilename(now = new Date()) {
+  const stamp = now.toISOString().replace(/[:.]/g, '-')
+  return `teoheng-web-app-favorites-${stamp}.json`
+}
+
+function buildFavoritesImportStatus({ addedCount, duplicateCount, invalidCount, totalCount }) {
+  const details = [`${addedCount} added`]
+
+  if (duplicateCount) {
+    details.push(`${duplicateCount} duplicates skipped`)
+  }
+
+  if (invalidCount) {
+    details.push(`${invalidCount} invalid skipped`)
+  }
+
+  details.push(`${totalCount} total`)
+
+  return `Imported favourites: ${details.join(', ')}.`
+}
+
+function downloadFavorites() {
+  try {
+    downloadTextFile(buildFavoritesFilename(), exportFavoriteSongs(), 'application/json;charset=utf-8')
+    favoritesTransferStatus.value = `Downloaded ${favoriteSongs.value.length} favourites.`
+    logDiagnosticEvent(`Favorites downloaded (${favoriteSongs.value.length} items)`)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    favoritesTransferStatus.value = 'Unable to download favourites.'
+    setLastError(message)
+    logDiagnosticEvent(`Favorites download failed: ${message}`)
+  }
+}
+
+async function importFavorites(file) {
+  if (!file) {
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(await file.text())
+    const { addedCount, duplicateCount, invalidCount, totalCount } = importFavoriteSongs(parsed)
+    favoritesTransferStatus.value = buildFavoritesImportStatus({ addedCount, duplicateCount, invalidCount, totalCount })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    favoritesTransferStatus.value = 'Unable to import favourites JSON.'
+    setLastError(message)
+    logDiagnosticEvent(`Favorites import failed: ${message}`)
+  }
+}
+
 const {
   favoriteSongs,
+  exportFavoriteSongs,
+  importFavoriteSongs,
   isFavoriteSong,
   syncFavoriteSongIds,
   toggleFavoriteSong: addFavoriteSong,
 } = useFavorites({
   storageKey: FAVORITES_STORAGE_KEY,
   logEvent: logDiagnosticEvent,
+})
+
+const favoriteTotalPages = computed(() => Math.max(1, Math.ceil(favoriteSongs.value.length / FAVORITES_PAGE_SIZE)))
+const favoriteDisplayPage = computed(() => favoritesPage.value + 1)
+const pagedFavoriteSongs = computed(() => {
+  const startIndex = favoritesPage.value * FAVORITES_PAGE_SIZE
+  return favoriteSongs.value.slice(startIndex, startIndex + FAVORITES_PAGE_SIZE)
 })
 
 watch(isDarkMode, () => {
@@ -445,6 +521,19 @@ watch(isDarkMode, () => {
 watch(micControlledByKod, () => {
   saveMicControlPreference()
 })
+
+watch(
+  () => favoriteSongs.value.length,
+  () => {
+    const maxPageIndex = Math.max(0, favoriteTotalPages.value - 1)
+
+    if (favoritesPage.value > maxPageIndex) {
+      favoritesPage.value = maxPageIndex
+    }
+
+    favoritesPageInput.value = favoritesPage.value + 1
+  },
+)
 
 onMounted(() => {
   syncFavoriteSongIds()
@@ -659,13 +748,24 @@ onBeforeUnmount(() => {
         <FavoritesPanel
           :active-mobile-tab="activeMobileTab"
           :active-browse-tab="activeBrowseTab"
-          :favorite-songs="favoriteSongs"
+          :favorite-songs="pagedFavoriteSongs"
+          :favorite-count="favoriteSongs.length"
+          :favorite-display-page="favoriteDisplayPage"
+          :favorite-page-input="favoritesPageInput"
+          :favorite-total-pages="favoriteTotalPages"
+          :favorites-transfer-status="favoritesTransferStatus"
           :singer-image-url="singerImageUrl"
           :is-song-queued="isSongQueued"
           :is-song-pending="isSongPending"
+          @download-favorites="downloadFavorites"
+          @import-favorites="importFavorites"
           @promote-song="promoteSong"
           @add-song="addSong"
           @favorite-song="addFavoriteSong"
+          @update:favorite-page-input="favoritesPageInput = $event"
+          @go-to-previous-page="goToPreviousFavoritesPage"
+          @go-to-next-page="goToNextFavoritesPage"
+          @go-to-page="goToFavoritesPage"
         />
       </div>
 

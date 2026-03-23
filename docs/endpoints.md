@@ -1,6 +1,6 @@
 # Endpoint Reference
 
-This document describes the device endpoints currently used or identified by custom-th-mobile-interface.
+This document describes the device endpoints currently used or identified by teoheng-web-app.
 
 The information here comes from:
 - live endpoint testing against a device on the local network
@@ -17,7 +17,7 @@ When option lists are mentioned in this document, their source matters:
 
 Important:
 - `SearchServlet` and `SingerServlet` do not currently appear to expose a self-describing metadata response listing all valid filter values.
-- In practice, custom-th-mobile-interface derives most filter values from the stock UI first, then validates them against live endpoint behavior.
+- In practice, teoheng-web-app derives most filter values from the stock UI first, then validates them against live endpoint behavior.
 
 ## Transport
 
@@ -124,7 +124,7 @@ Discovery method:
 - first found by inspecting the stock device UI
 - then spot-checked against live `SearchServlet` results
 
-- `''` = All in custom-th-mobile-interface default requests
+- `''` = All in teoheng-web-app default requests
 - `全部` = All in some stock UI flows
 - `国语` = Mandarin
 - `粤语` = Cantonese
@@ -146,7 +146,7 @@ Discovery method:
 - `其他` = Other
 
 Notes:
-- custom-th-mobile-interface standardizes default filter values to blank where possible, so `All` is sent as `lang=''`.
+- teoheng-web-app standardizes default filter values to blank where possible, so `All` is sent as `lang=''`.
 - `台语` did not appear in the stock UI.
 - In live testing, `台语` did not behave like a distinct supported value and appeared to fall back.
 
@@ -321,7 +321,7 @@ The filename comes from `sINGERPIC` in `SearchServlet` results.
 
 ## Related Stock UI Endpoints Found
 
-These were identified in the stock UI but are not currently used by custom-th-mobile-interface:
+These were identified in the stock UI but are not currently used by teoheng-web-app:
 
 - `SearchServletYb`
 - `SearchServletBanner`

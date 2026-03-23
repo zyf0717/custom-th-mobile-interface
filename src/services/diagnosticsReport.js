@@ -1,5 +1,5 @@
-export function downloadTextFile(filename, text) {
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+export function downloadTextFile(filename, text, mimeType = 'text/plain;charset=utf-8') {
+  const blob = new Blob([text], { type: mimeType })
   const objectUrl = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = objectUrl
@@ -33,7 +33,7 @@ export function buildDiagnosticsReport({
   events,
 }) {
   const lines = [
-    'custom-th-mobile-interface issue report',
+    'teoheng-web-app issue report',
     `Version: ${version}`,
     `Generated: ${generatedAt}`,
     `Base URL: ${baseUrl}`,
@@ -59,5 +59,5 @@ export function buildDiagnosticsReport({
 
 export function buildReportFilename(now = new Date()) {
   const stamp = now.toISOString().replace(/[:.]/g, '-')
-  return `custom-th-mobile-interface-issue-report-${stamp}.txt`
+  return `teoheng-web-app-issue-report-${stamp}.txt`
 }

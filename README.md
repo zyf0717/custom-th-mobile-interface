@@ -1,6 +1,6 @@
-# custom-th-mobile-interface
+# teoheng-web-app
 
-custom-th-mobile-interface is an alternative web UI for karaoke devices that expose the stock KOD HTTP/JSONP endpoints.
+teoheng-web-app is an alternative web UI for karaoke devices that expose the stock KOD HTTP/JSONP endpoints.
 
 This app focuses on a cleaner browser interface for:
 
@@ -118,7 +118,7 @@ https://ktv.yifei.sg/?baseUrl=http%3A%2F%2F172.24.132.70%3A8080
 
 ## How It Works
 
-custom-th-mobile-interface uses the same browser-facing endpoints as the stock device UI:
+teoheng-web-app uses the same browser-facing endpoints as the stock device UI:
 
 - `SearchServlet` for song search
 - `PlaylistServlet` for queue and playback state

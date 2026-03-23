@@ -595,6 +595,15 @@ th {
   width: 100%;
 }
 
+.action-cell .button-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  text-align: center;
+}
+
 .song-title-row,
 .singer-cell {
   display: flex;
@@ -704,6 +713,17 @@ th {
   margin-top: 1rem;
 }
 
+.favorites-toolbar {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.favorites-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .playlist {
   margin: 0;
   padding-left: 1.25rem;
@@ -769,6 +789,18 @@ th {
   justify-items: start;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .error-state {
   align-content: start;
   min-height: 10rem;
@@ -791,7 +823,7 @@ th {
 
 @media (max-width: 900px) {
   .app-shell {
-    padding: 1rem 0 calc(var(--command-bar-offset) + 1rem);
+    padding: 0 0 calc(var(--command-bar-offset) + 1rem);
   }
 
   .main-panels {
@@ -807,7 +839,7 @@ th {
   }
 
   .mobile-tabs.section-gap {
-    margin-top: 0.25rem;
+    margin-top: 0;
   }
 
   .mobile-tabs {

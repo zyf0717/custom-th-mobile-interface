@@ -318,7 +318,7 @@ const server = createServer((request, response) => {
     sendText(
       response,
       [
-        'custom-th-mobile-interface mock server',
+        'teoheng-web-app mock server',
         '',
         `SearchServlet: http://127.0.0.1:${PORT}/SearchServlet`,
         `SingerServlet: http://127.0.0.1:${PORT}/SingerServlet`,
@@ -331,7 +331,7 @@ const server = createServer((request, response) => {
 
   if (url.pathname.startsWith('/singer/')) {
     const fileName = decodeURIComponent(url.pathname.slice('/singer/'.length))
-    const title = SONGS.find((item) => item.singerPic === fileName)?.singer || 'custom-th-mobile-interface'
+    const title = SONGS.find((item) => item.singerPic === fileName)?.singer || 'teoheng-web-app'
     sendSvg(response, title)
     return
   }
@@ -366,6 +366,6 @@ const server = createServer((request, response) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`custom-th-mobile-interface mock server listening on http://${HOST}:${PORT}`)
+  console.log(`teoheng-web-app mock server listening on http://${HOST}:${PORT}`)
   console.log(`Use base URL: http://127.0.0.1:${PORT}`)
 })

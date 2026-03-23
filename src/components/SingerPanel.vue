@@ -136,7 +136,7 @@ function updateSingerPageInput(event) {
           >
             ◀
           </button>
-          <span>Page {{ singerDisplayPage }}<template v-if="singerState.maxPage">/{{ singerState.maxPage }}</template></span>
+          <span>{{ singerDisplayPage }}<template v-if="singerState.maxPage">/{{ singerState.maxPage }}</template></span>
           <button
             type="button"
             class="page-arrow page-arrow-next"
@@ -148,7 +148,6 @@ function updateSingerPageInput(event) {
         </div>
         <div class="page-jump-row">
           <label class="page-jump">
-            <span>Page:</span>
             <input
               :value="singerPageInput"
               type="text"
@@ -201,7 +200,7 @@ function updateSingerPageInput(event) {
           >
             ◀
           </button>
-          <span>Page {{ singerDisplayPage }}<template v-if="singerState.maxPage">/{{ singerState.maxPage }}</template></span>
+          <span>{{ singerDisplayPage }}<template v-if="singerState.maxPage">/{{ singerState.maxPage }}</template></span>
           <button
             data-test="singer-page-next"
             type="button"
@@ -214,7 +213,6 @@ function updateSingerPageInput(event) {
         </div>
         <div class="page-jump-row">
           <label class="page-jump">
-            <span>Page:</span>
             <input
               :value="singerPageInput"
               data-test="singer-page-input"

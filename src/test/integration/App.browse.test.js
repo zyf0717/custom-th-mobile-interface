@@ -179,6 +179,7 @@ describe('App', () => {
     const wrapper = mount(App)
 
     await flushPromises()
+    searchSongs.mockClear()
     await wrapper.get('summary.filter-summary').trigger('click')
     await wrapper.get('[data-test="search-song-name"]').setValue('Later')
     await wrapper.get('[data-test="search-singer"]').setValue('Eason')
@@ -191,6 +192,25 @@ describe('App', () => {
     expect(wrapper.get('[data-test="search-singer"]').element.value).toBe('')
     expect(wrapper.get('[data-test="search-language"]').element.value).toBe('')
     expect(wrapper.get('[data-test="search-song-type"]').element.value).toBe('')
+    expect(searchSongs).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  it('resets singer fields back to defaults without running a new search', async () => {
+    const wrapper = mount(App)
+
+    await flushPromises()
+    fetchSingers.mockClear()
+    await wrapper.get('[data-test="mobile-tab-singer"]').trigger('click')
+    await wrapper.get('[data-test="singer-search-name"]').setValue('\u5468')
+    await wrapper.get('[data-test="singer-search-country"]').setValue('\u5927\u9646')
+    await wrapper.get('[data-test="singer-search-reset"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="singer-search-name"]').element.value).toBe('')
+    expect(wrapper.get('[data-test="singer-search-country"]').element.value).toBe('\u5168\u90e8')
+    expect(fetchSingers).not.toHaveBeenCalled()
 
     wrapper.unmount()
   })
@@ -463,6 +483,135 @@ describe('App', () => {
     expect(mobilePanels[3].classes()).not.toContain('mobile-panel-hidden')
     expect(wrapper.text()).toContain('Favourites')
     expect(wrapper.text()).toContain('Lucky')
+
+    wrapper.unmount()
+  })
+
+  it('paginates favourites locally', async () => {
+    window.localStorage.setItem(
+      FAVORITES_STORAGE_KEY,
+      JSON.stringify(
+        Array.from({ length: 21 }, (_, index) => ({
+          id: String(9000 + index),
+          name: `Song ${index + 1}`,
+          singer: `Singer ${index + 1}`,
+          singerPic: '',
+          cloud: false,
+          savedAt: `2026-03-23T09:${String(index).padStart(2, '0')}:00.000Z`,
+        })),
+      ),
+    )
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="mobile-tab-favorites"]').trigger('click')
+
+    expect(wrapper.text()).toContain('1/2')
+    expect(wrapper.text()).toContain('Song 1')
+    expect(wrapper.text()).toContain('Song 20')
+    expect(wrapper.text()).not.toContain('Song 21')
+
+    await wrapper.get('[data-test="favorites-page-next"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('2/2')
+    expect(wrapper.text()).toContain('Song 21')
+    expect(wrapper.text()).not.toContain('Song 1')
+
+    wrapper.unmount()
+  })
+
+  it('downloads favourites as json from the favourites tab', async () => {
+    window.localStorage.setItem(
+      FAVORITES_STORAGE_KEY,
+      JSON.stringify([
+        {
+          id: '9029901',
+          name: 'Lucky',
+          singer: 'Tester',
+          singerPic: '26940.jpg',
+          cloud: false,
+          savedAt: '2026-03-23T09:00:00.000Z',
+        },
+      ]),
+    )
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="mobile-tab-favorites"]').trigger('click')
+    await wrapper.get('[data-test="favorites-download"]').trigger('click')
+    await flushPromises()
+
+    expect(createObjectUrl).toHaveBeenCalledTimes(1)
+    expect(anchorClick).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[data-test="favorites-transfer-status"]').text()).toBe('Downloaded 1 favourites.')
+
+    wrapper.unmount()
+  })
+
+  it('uploads favourites by appending new songs and skipping duplicates', async () => {
+    window.localStorage.setItem(
+      FAVORITES_STORAGE_KEY,
+      JSON.stringify([
+        {
+          id: '9029901',
+          name: 'Lucky',
+          singer: 'Tester',
+          singerPic: '26940.jpg',
+          cloud: false,
+          savedAt: '2026-03-23T09:00:00.000Z',
+        },
+      ]),
+    )
+
+    const wrapper = mount(App)
+
+    await flushPromises()
+    await wrapper.get('[data-test="mobile-tab-favorites"]').trigger('click')
+
+    const uploadFile = new File(
+      [
+        JSON.stringify([
+          { id: '9029901', name: 'Lucky duplicate' },
+          { id: '1486462', name: 'Ten Years', singer: 'Eason', cloud: false },
+        ]),
+      ],
+      'favorites.json',
+      { type: 'application/json' },
+    )
+
+    Object.defineProperty(uploadFile, 'text', {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(
+        JSON.stringify([
+          { id: '9029901', name: 'Lucky duplicate' },
+          { id: '1486462', name: 'Ten Years', singer: 'Eason', cloud: false },
+        ]),
+      ),
+    })
+
+    const uploadInput = wrapper.get('[data-test="favorites-upload-input"]')
+    Object.defineProperty(uploadInput.element, 'files', {
+      configurable: true,
+      value: [uploadFile],
+    })
+    await uploadInput.trigger('change')
+    await flushPromises()
+
+    const favorites = JSON.parse(window.localStorage.getItem(FAVORITES_STORAGE_KEY) || '[]')
+
+    expect(favorites).toHaveLength(2)
+    expect(favorites[0].id).toBe('9029901')
+    expect(favorites[1]).toEqual(
+      expect.objectContaining({
+        id: '1486462',
+        name: 'Ten Years',
+        singer: 'Eason',
+      }),
+    )
+    expect(wrapper.get('[data-test="favorites-transfer-status"]').text()).toBe('Imported favourites: 1 added, 1 duplicates skipped, 2 total.')
 
     wrapper.unmount()
   })

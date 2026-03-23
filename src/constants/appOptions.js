@@ -1,11 +1,10 @@
 export const POLL_INTERVAL_MS = 5000
 export const DIAGNOSTIC_EVENT_LIMIT = 25
+export const FAVORITES_PAGE_SIZE = 20
 export const SUPPORT_EMAIL = 'zyf0717@gmail.com'
 export const BASE_URL_QUERY_PARAM = 'baseUrl'
-export const MIC_CONTROL_STORAGE_KEY = 'custom-th-mobile-interface-mic-controlled'
-export const FAVORITES_STORAGE_KEY = 'custom-th-mobile-interface-favorites'
-export const LEGACY_MIC_CONTROL_STORAGE_KEY = 'open-kod-mic-controlled'
-export const LEGACY_FAVORITES_STORAGE_KEY = 'open-kod-favorites'
+export const MIC_CONTROL_STORAGE_KEY = 'teoheng-web-app-mic-controlled'
+export const FAVORITES_STORAGE_KEY = 'teoheng-web-app-favorites'
 export const CLOUD_MARKER = '\u2601'
 
 export const LANGUAGE_OPTIONS = [
