@@ -483,6 +483,8 @@ describe('App', () => {
     expect(mobilePanels[3].classes()).not.toContain('mobile-panel-hidden')
     expect(wrapper.text()).toContain('Favourites')
     expect(wrapper.text()).toContain('Lucky')
+    expect(wrapper.get('[data-test="favorite-panel-remove-song-9029901"]').text()).toBe('\u2B50\uFE0F')
+    expect(wrapper.get('[data-test="favorite-panel-promote-song-9029901"]').text()).toBe('\u23EB')
 
     wrapper.unmount()
   })
@@ -506,18 +508,20 @@ describe('App', () => {
 
     await flushPromises()
     await wrapper.get('[data-test="mobile-tab-favorites"]').trigger('click')
+    const favoritesPanel = wrapper.findAll('section.mobile-panel')[3]
 
-    expect(wrapper.text()).toContain('1/2')
-    expect(wrapper.text()).toContain('Song 1')
-    expect(wrapper.text()).toContain('Song 20')
-    expect(wrapper.text()).not.toContain('Song 21')
+    expect(favoritesPanel.text()).toContain('1/3')
+    expect(favoritesPanel.text()).toContain('Song 1')
+    expect(favoritesPanel.text()).toContain('Song 8')
+    expect(favoritesPanel.text()).not.toContain('Song 9')
 
     await wrapper.get('[data-test="favorites-page-next"]').trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('2/2')
-    expect(wrapper.text()).toContain('Song 21')
-    expect(wrapper.text()).not.toContain('Song 1')
+    expect(favoritesPanel.text()).toContain('2/3')
+    expect(favoritesPanel.text()).toContain('Song 9')
+    expect(favoritesPanel.text()).toContain('Song 16')
+    expect(favoritesPanel.text()).not.toContain('Song 17')
 
     wrapper.unmount()
   })

@@ -1,6 +1,6 @@
 export const POLL_INTERVAL_MS = 5000
 export const DIAGNOSTIC_EVENT_LIMIT = 25
-export const FAVORITES_PAGE_SIZE = 20
+export const FAVORITES_PAGE_SIZE = 8
 export const SUPPORT_EMAIL = 'zyf0717@gmail.com'
 export const BASE_URL_QUERY_PARAM = 'baseUrl'
 export const MIC_CONTROL_STORAGE_KEY = 'teoheng-web-app-mic-controlled'

@@ -116,7 +116,6 @@ function handleFileChange(event) {
           @change="handleFileChange"
         />
       </div>
-      <p class="field-help">{{ favoriteCount }} saved</p>
       <p v-if="favoritesTransferStatus" data-test="favorites-transfer-status" class="field-help">
         {{ favoritesTransferStatus }}
       </p>
@@ -183,7 +182,7 @@ function handleFileChange(event) {
                     :aria-label="`Remove ${song.name} from favorites`"
                     @click="emit('favorite-song', song)"
                   >
-                    â­ï¸
+                    &#11088;&#65039;
                   </button>
                   <button
                     :data-test="`favorite-panel-promote-song-${song.id}`"
@@ -192,7 +191,7 @@ function handleFileChange(event) {
                     :disabled="isSongPending(song.id)"
                     @click="emit('promote-song', song.id)"
                   >
-                    â«
+                    &#9195;
                   </button>
                   <button
                     :data-test="`favorite-panel-add-song-${song.id}`"
